@@ -75,6 +75,9 @@ class Game {
         this.gridDistortions = [];
         this.whiteFlashTimer = 0;
 
+        // Bản đồ game (cyber, jungle, desert)
+        this.mapTheme = 'cyber';
+
         // Ghi nhận thời gian cuối cùng cập nhật để tính deltaTime
         this.lastTime = 0;
 
@@ -445,6 +448,10 @@ class Game {
     }
 
     startGame() {
+        // Random bản đồ khi bắt đầu game
+        const mapThemes = ['cyber', 'jungle', 'desert'];
+        this.mapTheme = mapThemes[Math.floor(Math.random() * mapThemes.length)];
+
         // Tạo lại các thực thể
         this.player = new Player(this.worldSize / 2, this.worldSize / 2, this.selectedRole);
         
@@ -570,18 +577,67 @@ class Game {
             this.barrels.push(new Barrel(bx, by));
         }
         
-        // Khởi tạo các hạt bụi vũ trụ neon (space dust stars)
+        // Khởi tạo các hạt nền đặc trưng cho từng bản đồ (đom đóm rừng, cát sa mạc, bụi vũ trụ)
         this.stars = [];
-        const starColors = ['#00f0ff', '#ff007f', '#39ff14', '#ffffff', '#b026ff'];
-        for (let i = 0; i < 200; i++) {
-            this.stars.push({
-                x: Math.random() * this.worldSize,
-                y: Math.random() * this.worldSize,
-                radius: 0.8 + Math.random() * 1.5,
-                color: starColors[Math.floor(Math.random() * starColors.length)],
-                alpha: 0.12 + Math.random() * 0.3 // Độ sáng vừa phải làm nền cuốn trôi
-            });
+        if (this.mapTheme === 'jungle') {
+            const fireflyColors = ['#39ff14', '#aacc00', '#55ff00', '#76ff03'];
+            for (let i = 0; i < 120; i++) {
+                const baseAlpha = 0.15 + Math.random() * 0.35;
+                this.stars.push({
+                    x: Math.random() * this.worldSize,
+                    y: Math.random() * this.worldSize,
+                    radius: 1.2 + Math.random() * 1.6, // Đom đóm to hơn hạt bụi thường
+                    color: fireflyColors[Math.floor(Math.random() * fireflyColors.length)],
+                    alpha: baseAlpha,
+                    baseAlpha: baseAlpha,
+                    angle: Math.random() * Math.PI * 2,
+                    flickerTimer: Math.random() * 100
+                });
+            }
+        } else if (this.mapTheme === 'desert') {
+            const sandColors = ['#e9c46a', '#f4a261', '#e76f51', '#d4a373', '#e09f67'];
+            for (let i = 0; i < 180; i++) {
+                this.stars.push({
+                    x: Math.random() * this.worldSize,
+                    y: Math.random() * this.worldSize,
+                    radius: 0.6 + Math.random() * 1.0, // Hạt cát nhỏ mịn trôi nổi
+                    color: sandColors[Math.floor(Math.random() * sandColors.length)],
+                    alpha: 0.15 + Math.random() * 0.3,
+                    speed: 0.4 + Math.random() * 1.2
+                });
+            }
+        } else {
+            // Cyber theme (mặc định)
+            const starColors = ['#00f0ff', '#ff007f', '#39ff14', '#ffffff', '#b026ff'];
+            for (let i = 0; i < 200; i++) {
+                this.stars.push({
+                    x: Math.random() * this.worldSize,
+                    y: Math.random() * this.worldSize,
+                    radius: 0.8 + Math.random() * 1.5,
+                    color: starColors[Math.floor(Math.random() * starColors.length)],
+                    alpha: 0.12 + Math.random() * 0.3
+                });
+            }
         }
+
+        // Hiện thông báo tên bản đồ bằng FloatingText rực rỡ
+        const mapNames = {
+            'cyber': 'BẢN ĐỒ CYBERPUNK CỔ ĐIỂN',
+            'jungle': 'THUNG LŨNG RỪNG RẬM / JUNGLE VALLEY',
+            'desert': 'HẺM NÚI SA MẠC / DESERT CANYON'
+        };
+        const mapColors = {
+            'cyber': '#00f0ff',
+            'jungle': '#39ff14',
+            'desert': '#e9c46a'
+        };
+        this.floatingTexts.push(new FloatingText(
+            this.player.x, 
+            this.player.y - 120, 
+            mapNames[this.mapTheme], 
+            mapColors[this.mapTheme], 
+            22
+        ));
         
         this.gameTime = 0;
         this.kills = 0;
@@ -1093,6 +1149,38 @@ class Game {
         // Giới hạn Camera trong bản đồ World Size (3000 x 3000)
         this.camera.x = Math.max(0, Math.min(this.worldSize - this.canvas.width, this.camera.x));
         this.camera.y = Math.max(0, Math.min(this.worldSize - this.canvas.height, this.camera.y));
+
+        // Cập nhật hạt bụi vũ trụ / đom đóm / gió cát nền của bản đồ
+        if (this.stars) {
+            this.stars.forEach(star => {
+                if (this.mapTheme === 'jungle') {
+                    // Đom đóm bay lượn ngẫu nhiên nhẹ nhàng
+                    star.angle = (star.angle || 0) + (Math.random() - 0.5) * 0.1;
+                    star.x += Math.cos(star.angle) * 0.25 * (deltaTime / 16);
+                    star.y += Math.sin(star.angle) * 0.25 * (deltaTime / 16);
+                    
+                    // Giữ đom đóm trong biên giới bản đồ
+                    if (star.x < 0) star.x += this.worldSize;
+                    if (star.x > this.worldSize) star.x -= this.worldSize;
+                    if (star.y < 0) star.y += this.worldSize;
+                    if (star.y > this.worldSize) star.y -= this.worldSize;
+
+                    // Nhấp nháy nhẹ độ sáng qua hàm sin
+                    star.flickerTimer = (star.flickerTimer || 0) + deltaTime * 0.002;
+                    star.alpha = star.baseAlpha + Math.sin(star.flickerTimer) * 0.12;
+                    star.alpha = Math.max(0.08, Math.min(0.65, star.alpha));
+                } else if (this.mapTheme === 'desert') {
+                    // Gió cát thổi bụi cát bay ngang từ trái sang phải
+                    star.x += (1.6 + star.speed) * (deltaTime / 16);
+                    star.y += (Math.random() - 0.5) * 0.25 * (deltaTime / 16);
+                    
+                    if (star.x > this.worldSize) {
+                        star.x = 0;
+                        star.y = Math.random() * this.worldSize;
+                    }
+                }
+            });
+        }
 
         // Cập nhật Hạt nổ (Particles)
         for (let i = this.particles.length - 1; i >= 0; i--) {
@@ -2921,17 +3009,35 @@ class Game {
             this.ctx.translate(dx, dy);
         }
 
-        // 1. Vẽ nền màn hình tối sâu
-        this.ctx.fillStyle = '#030712';
+        // 1. Vẽ nền màn hình tối sâu theo từng loại bản đồ
+        let bgStyle = '#030712'; // Cyber theme background
+        let gridStroke = 'rgba(255, 255, 255, 0.05)'; // Cyber grid lines
+        
+        if (this.mapTheme === 'jungle') {
+            bgStyle = '#02140d'; // Deep jungle green
+            gridStroke = 'rgba(74, 120, 86, 0.08)'; // Mossy green grid
+        } else if (this.mapTheme === 'desert') {
+            bgStyle = '#140d07'; // Dusty canyon brown
+            gridStroke = 'rgba(244, 164, 96, 0.08)'; // Warm sandy grid
+        }
+        
+        this.ctx.fillStyle = bgStyle;
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
-        // 1.5. Vẽ các hạt bụi vũ trụ làm nền cuộn trôi (Space dust background)
+        // 1.5. Vẽ các hạt nền (Space dust / đom đóm / bão cát)
         if (this.stars) {
             this.stars.forEach(star => {
                 if (this.isInView(star.x, star.y, star.radius)) {
                     const screenX = star.x - this.camera.x;
                     const screenY = star.y - this.camera.y;
                     this.ctx.save();
+                    
+                    if (this.mapTheme === 'jungle') {
+                        // Đom đóm phát sáng nhòe (glow)
+                        this.ctx.shadowColor = star.color;
+                        this.ctx.shadowBlur = 6;
+                    }
+                    
                     this.ctx.globalAlpha = star.alpha;
                     this.ctx.fillStyle = star.color;
                     this.ctx.beginPath();
@@ -2944,7 +3050,7 @@ class Game {
 
         // 2. Vẽ lưới ô vuông nền thế giới Cyber — gộp tất cả đường vào 1 path duy nhất
         const gridSize = 80;
-        this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+        this.ctx.strokeStyle = gridStroke;
         this.ctx.lineWidth = 1;
         
         const startX = Math.floor(this.camera.x / gridSize) * gridSize;
@@ -3022,14 +3128,25 @@ class Game {
         const top = 0 - this.camera.y;
         const bottom = this.worldSize - this.camera.y;
 
+        let boundaryGlow = 'rgba(176, 38, 255, 0.2)'; // Cyber purple glow
+        let boundaryCore = '#b026ff'; // Cyber purple core
+        
+        if (this.mapTheme === 'jungle') {
+            boundaryGlow = 'rgba(46, 125, 50, 0.35)'; // Jungle green glow
+            boundaryCore = '#2e7d32'; // Jungle green core
+        } else if (this.mapTheme === 'desert') {
+            boundaryGlow = 'rgba(212, 140, 72, 0.3)'; // Desert orange glow
+            boundaryCore = '#d48c48'; // Desert orange core
+        }
+
         this.ctx.save();
         // 1. Quầng sáng ranh giới (Outer Glow)
-        this.ctx.strokeStyle = 'rgba(176, 38, 255, 0.2)';
+        this.ctx.strokeStyle = boundaryGlow;
         this.ctx.lineWidth = 16;
         this.ctx.strokeRect(left, top, this.worldSize, this.worldSize);
 
         // 2. Viền ranh giới chính (Solid Core)
-        this.ctx.strokeStyle = '#b026ff';
+        this.ctx.strokeStyle = boundaryCore;
         this.ctx.lineWidth = 4;
         this.ctx.strokeRect(left, top, this.worldSize, this.worldSize);
         this.ctx.restore();
@@ -3073,14 +3190,14 @@ class Game {
         // 3.7. Vẽ các Cột chướng ngại vật
         this.pillars.forEach(p => {
             if (this.isInView(p.x, p.y, p.radius)) {
-                p.draw(this.ctx, this.camera);
+                p.draw(this.ctx, this.camera, this.mapTheme);
             }
         });
 
         // 3.8. Vẽ các Thùng thuốc nổ
         this.barrels.forEach(b => {
             if (this.isInView(b.x, b.y, b.radius)) {
-                b.draw(this.ctx, this.camera);
+                b.draw(this.ctx, this.camera, this.mapTheme);
             }
         });
 
