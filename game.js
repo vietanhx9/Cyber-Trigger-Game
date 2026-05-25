@@ -795,6 +795,15 @@ class Enemy {
                 this.xpValue = 5;
                 this.color = '#b026ff'; // Neon Purple
                 break;
+            case 'mine':
+                this.radius = 12;
+                this.speed = 0;
+                this.hp = 1;
+                this.maxHp = 1;
+                this.damage = 20;
+                this.xpValue = 0;
+                this.color = '#ff9f00'; // Neon Orange for mine flashing
+                break;
             case 'shooter':
                 this.radius = 18;
                 this.speed = 2.0;
@@ -823,6 +832,10 @@ class Enemy {
         this.y += this.knockbackY;
         this.knockbackX *= 0.8;
         this.knockbackY *= 0.8;
+
+        if (this.type === 'mine') {
+            return;
+        }
 
         this.angle = Vector.angle(this.x, this.y, player.x, player.y);
         const distToPlayer = Vector.dist(this.x, this.y, player.x, player.y);
@@ -901,6 +914,31 @@ class Enemy {
         ctx.fillStyle = 'rgba(15, 10, 20, 0.8)';
         ctx.beginPath();
 
+        if (this.type === 'mine') {
+            ctx.restore();
+            ctx.save();
+            ctx.translate(screenX, screenY);
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = this.color;
+            ctx.strokeStyle = this.color;
+            ctx.lineWidth = 2.5;
+            
+            const flash = Math.floor(Date.now() / 150) % 2 === 0;
+            ctx.fillStyle = flash ? 'rgba(255, 159, 0, 0.45)' : 'rgba(20, 10, 0, 0.9)';
+            
+            ctx.beginPath();
+            ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+            
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(0, 0, this.radius * 0.4, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+            return;
+        }
+
         if (this.type === 'tanker') {
             // Hình lục giác gồ ghề
             const r = this.radius;
@@ -955,21 +993,70 @@ class Enemy {
 
 // Boss Entity (Giant Monster)
 class Boss extends Enemy {
-    constructor(x, y) {
+    constructor(x, y, bossType = null) {
         super(x, y, 1, 'boss');
-        this.radius = 65;
-        this.speed = 1.0;
-        this.maxHp = 1000;
-        this.hp = this.maxHp;
-        this.damage = 30;
-        this.color = '#fffb00'; // Neon Yellow-Orange
-        this.xpValue = 50; // Boss XP lớn
-
+        
+        const bossTypes = ['yellow_intruder', 'neon_vortex', 'synapse_reaper', 'arch_overseer', 'grid_infection'];
+        this.bossType = bossType || bossTypes[Math.floor(Math.random() * bossTypes.length)];
+        
         this.bossTimer = 0;
-        this.bossState = 'WALK'; // 'WALK', 'CHARGE_PREP', 'CHARGE_DASH', 'BURST', 'SUMMON'
+        this.bossState = 'WALK';
         this.stateTimer = 0;
-        this.chargeAngle = 0;
-        this.chargeSpeed = 16;
+        
+        switch (this.bossType) {
+            case 'yellow_intruder':
+                this.name = 'CYBER INTRUDER';
+                this.radius = 65;
+                this.speed = 1.0;
+                this.maxHp = 1000;
+                this.damage = 30;
+                this.color = '#fffb00'; // Neon Yellow-Orange
+                this.chargeAngle = 0;
+                this.chargeSpeed = 16;
+                break;
+            case 'neon_vortex':
+                this.name = 'NEON VORTEX';
+                this.radius = 60;
+                this.speed = 0.8;
+                this.maxHp = 1200;
+                this.damage = 25;
+                this.color = '#b026ff'; // Neon Purple
+                this.shieldAngle = 0;
+                this.shieldHitTimer = 0;
+                break;
+            case 'synapse_reaper':
+                this.name = 'SYNAPSE REAPER';
+                this.radius = 55;
+                this.speed = 2.2;
+                this.maxHp = 900;
+                this.damage = 35;
+                this.color = '#ff007f'; // Neon Pink
+                break;
+            case 'arch_overseer':
+                this.name = 'ARCH OVERSEER';
+                this.radius = 75;
+                this.speed = 0.6;
+                this.maxHp = 1600;
+                this.damage = 40;
+                this.color = '#00f0ff'; // Neon Cyan
+                this.laserAngle = 0;
+                this.laserActive = false;
+                break;
+            case 'grid_infection':
+                this.name = 'GRID INFECTION';
+                this.radius = 60;
+                this.speed = 1.2;
+                this.maxHp = 1000;
+                this.damage = 28;
+                this.color = '#ff9f00'; // Neon Orange
+                this.hasSplit = false;
+                this.isClone = false;
+                break;
+        }
+        
+        this.hp = this.maxHp;
+        this.xpValue = 60;
+        this.silentDeath = false;
     }
 
     update(player, gameBullets, deltaTime, gameEngineRef) {
@@ -983,68 +1070,376 @@ class Boss extends Enemy {
         this.bossTimer += deltaTime;
         this.stateTimer += deltaTime;
 
-        // Xử lý cỗ máy trạng thái (Boss State Machine)
-        switch (this.bossState) {
-            case 'WALK':
-                // Đuổi theo người chơi chậm rãi
-                this.x += Math.cos(this.angle) * this.speed;
-                this.y += Math.sin(this.angle) * this.speed;
+        // Cập nhật hồi chiêu chém khiên cho vortex
+        if (this.shieldHitTimer && this.shieldHitTimer > 0) {
+            this.shieldHitTimer -= deltaTime;
+        }
 
-                // Cứ mỗi 5 giây đổi trạng thái ngẫu nhiên
-                if (this.stateTimer >= 5000) {
-                    this.stateTimer = 0;
-                    const states = ['CHARGE_PREP', 'BURST', 'SUMMON'];
-                    this.bossState = states[Math.floor(Math.random() * states.length)];
+        // Xử lý cỗ máy trạng thái (Boss State Machine) theo từng Boss Type
+        switch (this.bossType) {
+            case 'yellow_intruder':
+                switch (this.bossState) {
+                    case 'WALK':
+                        this.x += Math.cos(this.angle) * this.speed;
+                        this.y += Math.sin(this.angle) * this.speed;
+                        if (this.stateTimer >= 5000) {
+                            this.stateTimer = 0;
+                            const states = ['CHARGE_PREP', 'BURST', 'SUMMON'];
+                            this.bossState = states[Math.floor(Math.random() * states.length)];
+                        }
+                        break;
+                    case 'CHARGE_PREP':
+                        this.color = '#ff3131'; 
+                        if (this.stateTimer >= 1000) {
+                            this.stateTimer = 0;
+                            this.bossState = 'CHARGE_DASH';
+                            this.chargeAngle = Vector.angle(this.x, this.y, player.x, player.y);
+                            sounds.playDash();
+                        }
+                        break;
+                    case 'CHARGE_DASH':
+                        this.color = '#ff9f00'; 
+                        this.x += Math.cos(this.chargeAngle) * this.chargeSpeed;
+                        this.y += Math.sin(this.chargeAngle) * this.chargeSpeed;
+                        if (Math.random() < 0.4) {
+                            gameEngineRef.particles.push(new Particle(this.x, this.y, '#ff3131'));
+                        }
+                        if (this.stateTimer >= 1200) {
+                            this.stateTimer = 0;
+                            this.bossState = 'WALK';
+                            this.color = '#fffb00';
+                        }
+                        break;
+                    case 'BURST':
+                        if (this.stateTimer % 400 < deltaTime) {
+                            this.fireBulletCircle(gameBullets);
+                        }
+                        if (this.stateTimer >= 2200) {
+                            this.stateTimer = 0;
+                            this.bossState = 'WALK';
+                        }
+                        break;
+                    case 'SUMMON':
+                        if (this.stateTimer >= 1000) {
+                            this.stateTimer = 0;
+                            this.bossState = 'WALK';
+                            this.summonMinions(gameEngineRef);
+                        }
+                        break;
                 }
                 break;
 
-            case 'CHARGE_PREP':
-                // Khóa mục tiêu và gồng năng lượng (Đứng yên 1 giây, đổi màu đỏ hồng cảnh báo)
-                this.color = '#ff3131'; 
-                if (this.stateTimer >= 1000) {
-                    this.stateTimer = 0;
-                    this.bossState = 'CHARGE_DASH';
-                    this.chargeAngle = Vector.angle(this.x, this.y, player.x, player.y);
-                    sounds.playDash(); // Sound dash
+            case 'neon_vortex':
+                const pullAngle = Vector.angle(player.x, player.y, this.x, this.y);
+                const pullDist = Vector.dist(player.x, player.y, this.x, this.y);
+                
+                switch (this.bossState) {
+                    case 'WALK':
+                        this.x += Math.cos(this.angle) * this.speed;
+                        this.y += Math.sin(this.angle) * this.speed;
+                        
+                        // Hút nhẹ người chơi
+                        if (pullDist < 600) {
+                            player.x += Math.cos(pullAngle) * 0.6;
+                            player.y += Math.sin(pullAngle) * 0.6;
+                        }
+                        
+                        if (this.stateTimer >= 5000) {
+                            this.stateTimer = 0;
+                            const states = ['GRAVITY_PULL', 'SHIELD_UP'];
+                            this.bossState = states[Math.floor(Math.random() * states.length)];
+                        }
+                        break;
+                        
+                    case 'GRAVITY_PULL':
+                        // Hút mạnh người chơi
+                        if (pullDist < 700) {
+                            player.x += Math.cos(pullAngle) * 1.8;
+                            player.y += Math.sin(pullAngle) * 1.8;
+                        }
+                        
+                        // Bắn 8 viên đạn tím tỏa tròn di chuyển chậm
+                        if (this.stateTimer % 500 < deltaTime) {
+                            sounds.playShoot();
+                            const bulletCount = 8;
+                            const bSpeed = 2.8;
+                            for (let i = 0; i < bulletCount; i++) {
+                                const angle = (Math.PI * 2 / bulletCount) * i + Math.random() * 0.1;
+                                const vx = Math.cos(angle) * bSpeed;
+                                const vy = Math.sin(angle) * bSpeed;
+                                gameBullets.push(new Bullet(
+                                    this.x + Math.cos(angle) * this.radius,
+                                    this.y + Math.sin(angle) * this.radius,
+                                    vx,
+                                    vy,
+                                    8,
+                                    this.damage * 0.6,
+                                    '#b026ff',
+                                    false
+                                ));
+                            }
+                        }
+                        
+                        if (this.stateTimer >= 3000) {
+                            this.stateTimer = 0;
+                            this.bossState = 'WALK';
+                        }
+                        break;
+                        
+                    case 'SHIELD_UP':
+                        // Di chuyển nhanh hướng về người chơi
+                        this.x += Math.cos(this.angle) * (this.speed * 1.35);
+                        this.y += Math.sin(this.angle) * (this.speed * 1.35);
+                        
+                        if (this.stateTimer >= 4000) {
+                            this.stateTimer = 0;
+                            this.bossState = 'WALK';
+                        }
+                        break;
                 }
                 break;
 
-            case 'CHARGE_DASH':
-                // Lao húc cực nhanh theo hướng đã gồng
-                this.color = '#ff9f00'; // Orange
-                this.x += Math.cos(this.chargeAngle) * this.chargeSpeed;
-                this.y += Math.sin(this.chargeAngle) * this.chargeSpeed;
-
-                // Hiệu ứng hạt lửa phản lực phía sau Boss
-                if (Math.random() < 0.4) {
-                    gameEngineRef.particles.push(new Particle(this.x, this.y, '#ff3131'));
-                }
-
-                if (this.stateTimer >= 1200) { // Lao húc trong 1.2s
-                    this.stateTimer = 0;
-                    this.bossState = 'WALK';
-                    this.color = '#fffb00'; // Reset màu
+            case 'synapse_reaper':
+                switch (this.bossState) {
+                    case 'WALK':
+                        this.x += Math.cos(this.angle) * this.speed;
+                        this.y += Math.sin(this.angle) * this.speed;
+                        
+                        if (this.stateTimer >= 4000) {
+                            this.stateTimer = 0;
+                            const states = ['SWORD_FLURRY', 'BLINK_ATTACK'];
+                            this.bossState = states[Math.floor(Math.random() * states.length)];
+                        }
+                        break;
+                        
+                    case 'SWORD_FLURRY':
+                        // Đuổi theo người chơi tốc độ vừa phải và chém kiếm liên tục
+                        this.x += Math.cos(this.angle) * (this.speed * 0.6);
+                        this.y += Math.sin(this.angle) * (this.speed * 0.6);
+                        
+                        if (this.stateTimer % 350 < deltaTime) {
+                            this.triggerBossSwordSlash(gameEngineRef);
+                        }
+                        
+                        if (this.stateTimer >= 2400) {
+                            this.stateTimer = 0;
+                            this.bossState = 'WALK';
+                        }
+                        break;
+                        
+                    case 'BLINK_ATTACK':
+                        // Đứng yên gồng tàng hình
+                        if (this.stateTimer < 1000) {
+                            this.speed = 0;
+                        } else if (this.stateTimer >= 1000 && this.stateTimer < 1100) {
+                            // Dịch chuyển tức thời tới sát người chơi
+                            const randAngle = Math.random() * Math.PI * 2;
+                            this.x = player.x + Math.cos(randAngle) * 90;
+                            this.y = player.y + Math.sin(randAngle) * 90;
+                            
+                            // Phát tiếng vung kiếm và thực hiện chém tròn 360 độ
+                            this.triggerBossCircularSlash(gameEngineRef);
+                            this.stateTimer = 1100; // Nhảy qua bước tiếp theo
+                        } else if (this.stateTimer >= 1700) { // Đứng yên 0.6s sau chém rồi chạy tiếp
+                            this.speed = 2.2;
+                            this.stateTimer = 0;
+                            this.bossState = 'WALK';
+                        }
+                        break;
                 }
                 break;
 
-            case 'BURST':
-                // Đứng yên phun đạn tỏa tròn liên tiếp
-                if (this.stateTimer % 400 < deltaTime) { // Phun mỗi 0.4 giây
-                    this.fireBulletCircle(gameBullets);
-                }
-
-                if (this.stateTimer >= 2200) { // Đứng yên bắn trong 2.2s
-                    this.stateTimer = 0;
-                    this.bossState = 'WALK';
+            case 'arch_overseer':
+                switch (this.bossState) {
+                    case 'WALK':
+                        this.x += Math.cos(this.angle) * this.speed;
+                        this.y += Math.sin(this.angle) * this.speed;
+                        
+                        // Bắn 1 tia đạn laser cyan đơn lẻ hướng người chơi mỗi 1s
+                        if (this.stateTimer % 1000 < deltaTime) {
+                            sounds.playShoot();
+                            const bSpeed = 10;
+                            const vx = Math.cos(this.angle) * bSpeed;
+                            const vy = Math.sin(this.angle) * bSpeed;
+                            gameBullets.push(new Bullet(
+                                this.x + Math.cos(this.angle) * this.radius,
+                                this.y + Math.sin(this.angle) * this.radius,
+                                vx,
+                                vy,
+                                6,
+                                this.damage * 0.5,
+                                '#00f0ff',
+                                false
+                            ));
+                        }
+                        
+                        if (this.stateTimer >= 6000) {
+                            this.stateTimer = 0;
+                            const states = ['LASER_BEAM', 'MISSILE_BARRAGE'];
+                            this.bossState = states[Math.floor(Math.random() * states.length)];
+                        }
+                        break;
+                        
+                    case 'LASER_BEAM':
+                        this.laserAngle += 0.018 * (deltaTime / 16.67);
+                        
+                        // Kiểm tra va chạm với người chơi mỗi 120ms
+                        if (!this.lastLaserDamageTime) this.lastLaserDamageTime = 0;
+                        if (Date.now() - this.lastLaserDamageTime > 120) {
+                            this.lastLaserDamageTime = Date.now();
+                            
+                            const checkLaserCollision = (angle) => {
+                                const lx = Math.cos(angle);
+                                const ly = Math.sin(angle);
+                                const px = player.x - this.x;
+                                const py = player.y - this.y;
+                                const projection = px * lx + py * ly;
+                                if (projection > 0 && projection < 800) {
+                                    const cx = this.x + lx * projection;
+                                    const cy = this.y + ly * projection;
+                                    const dist = Vector.dist(player.x, player.y, cx, cy);
+                                    return dist < player.radius + 12;
+                                }
+                                return false;
+                            };
+                            
+                            if (checkLaserCollision(this.laserAngle) || checkLaserCollision(this.laserAngle + Math.PI)) {
+                                const damaged = player.takeDamage(10);
+                                if (damaged) {
+                                    gameEngineRef.triggerScreenShake(5, 100);
+                                    gameEngineRef.floatingTexts.push(new FloatingText(player.x, player.y - 20, `-10`, '#ff3131', 18));
+                                    gameEngineRef.spawnBloodParticles(player.x, player.y, '#ff3131');
+                                }
+                            }
+                        }
+                        
+                        if (this.stateTimer >= 4000) {
+                            this.stateTimer = 0;
+                            this.bossState = 'WALK';
+                        }
+                        break;
+                        
+                    case 'MISSILE_BARRAGE':
+                        // Phóng tên lửa tầm nhiệt đỏ đuổi mục tiêu
+                        if (this.stateTimer % 500 < deltaTime && this.stateTimer < 2500) {
+                            gameEngineRef.homingMissiles.push(new HomingMissile(
+                                this.x,
+                                this.y,
+                                player,
+                                this.damage * 0.8,
+                                true // isEnemyMissile = true
+                            ));
+                            sounds.playShoot();
+                        }
+                        
+                        if (this.stateTimer >= 3200) {
+                            this.stateTimer = 0;
+                            this.bossState = 'WALK';
+                        }
+                        break;
                 }
                 break;
 
-            case 'SUMMON':
-                // Triệu hồi 4 quái nhỏ xung quanh
-                if (this.stateTimer >= 1000) {
-                    this.stateTimer = 0;
-                    this.bossState = 'WALK';
-                    this.summonMinions(gameEngineRef);
+            case 'grid_infection':
+                // Check if hp < 50% to trigger split (only for original boss, not clones)
+                if (!this.hasSplit && this.hp < this.maxHp * 0.5 && !this.isClone) {
+                    this.hasSplit = true;
+                    
+                    // Tạo 2 phân thân nhỏ hơn
+                    const c1 = new Boss(this.x - 50, this.y, 'grid_infection');
+                    c1.isClone = true;
+                    c1.hasSplit = true;
+                    c1.radius = this.radius * 0.65;
+                    c1.maxHp = this.maxHp * 0.35;
+                    c1.hp = c1.maxHp;
+                    c1.damage = this.damage * 0.5;
+                    c1.speed = this.speed * 1.25;
+                    c1.xpValue = 15;
+                    
+                    const c2 = new Boss(this.x + 50, this.y, 'grid_infection');
+                    c2.isClone = true;
+                    c2.hasSplit = true;
+                    c2.radius = this.radius * 0.65;
+                    c2.maxHp = this.maxHp * 0.35;
+                    c2.hp = c2.maxHp;
+                    c2.damage = this.damage * 0.5;
+                    c2.speed = this.speed * 1.25;
+                    c2.xpValue = 15;
+                    
+                    gameEngineRef.enemies.push(c1);
+                    gameEngineRef.enemies.push(c2);
+                    
+                    // Nếu boss hiện tại đang là activeBoss, chuyển activeBoss sang clone 1 để thanh máu hiển thị máu clone 1
+                    if (gameEngineRef.activeBoss === this) {
+                        gameEngineRef.activeBoss = c1;
+                    }
+                    
+                    // Sound & particles
+                    sounds.playExplosion();
+                    gameEngineRef.spawnBloodParticles(this.x, this.y, '#ff9f00', 15);
+                    gameEngineRef.blastRings.push(new BlastRing(this.x, this.y, 100, '#ff9f00'));
+                    
+                    // Hủy boss gốc nhẹ nhàng
+                    this.hp = 0;
+                    this.silentDeath = true;
+                    return;
+                }
+                
+                switch (this.bossState) {
+                    case 'WALK':
+                        this.x += Math.cos(this.angle) * this.speed;
+                        this.y += Math.sin(this.angle) * this.speed;
+                        
+                        // Bắn 3 tia đạn cam chùm hướng người chơi mỗi 1.5s
+                        if (this.stateTimer % 1500 < deltaTime) {
+                            sounds.playShoot();
+                            const bSpeed = 6.5;
+                            const spread = 0.2; // ~11 độ
+                            const angles = [this.angle - spread, this.angle, this.angle + spread];
+                            
+                            angles.forEach(ang => {
+                                const vx = Math.cos(ang) * bSpeed;
+                                const vy = Math.sin(ang) * bSpeed;
+                                gameBullets.push(new Bullet(
+                                    this.x + Math.cos(ang) * this.radius,
+                                    this.y + Math.sin(ang) * this.radius,
+                                    vx,
+                                    vy,
+                                    6.5,
+                                    this.damage * 0.4,
+                                    '#ff9f00',
+                                    false
+                                ));
+                            });
+                        }
+                        
+                        if (this.stateTimer >= 5000) {
+                            this.stateTimer = 0;
+                            this.bossState = 'MINE_LAYING';
+                        }
+                        break;
+                        
+                    case 'MINE_LAYING':
+                        // Di chuyển ngẫu nhiên và thả mìn cam nhấp nháy
+                        if (!this.mineMoveAngle) {
+                            this.mineMoveAngle = Math.random() * Math.PI * 2;
+                        }
+                        this.x += Math.cos(this.mineMoveAngle) * (this.speed * 1.2);
+                        this.y += Math.sin(this.mineMoveAngle) * (this.speed * 1.2);
+                        
+                        if (this.stateTimer % 800 < deltaTime && this.stateTimer < 2400) {
+                            sounds.playPickup(); // Beep drop sound
+                            const mine = new Enemy(this.x, this.y, 1, 'mine');
+                            gameEngineRef.enemies.push(mine);
+                            gameEngineRef.spawnBloodParticles(this.x, this.y, '#ff9f00', 3);
+                        }
+                        
+                        if (this.stateTimer >= 2500) {
+                            this.stateTimer = 0;
+                            this.mineMoveAngle = null;
+                            this.bossState = 'WALK';
+                        }
+                        break;
                 }
                 break;
         }
@@ -1088,44 +1483,286 @@ class Boss extends Enemy {
         });
     }
 
+    triggerBossSwordSlash(gameEngineRef) {
+        sounds.playSwordSlash();
+        const angle = this.angle;
+        // Visual pink slash (no damage from the slash entity itself)
+        gameEngineRef.swordSlashes.push(new SwordSlash(this.x, this.y, angle, 130, '#ff007f', 0)); 
+        
+        // Manual damage check on player
+        const dist = Vector.dist(this.x, this.y, gameEngineRef.player.x, gameEngineRef.player.y);
+        if (dist < 130 + gameEngineRef.player.radius) {
+            const angleToPlayer = Math.atan2(gameEngineRef.player.y - this.y, gameEngineRef.player.x - this.x);
+            let diff = Math.abs(angleToPlayer - angle);
+            if (diff > Math.PI) diff = Math.PI * 2 - diff;
+            
+            if (diff < Math.PI / 2.5) { // 72 degree cone
+                const damaged = gameEngineRef.player.takeDamage(this.damage * 0.6);
+                if (damaged) {
+                    gameEngineRef.triggerScreenShake(8, 150);
+                    gameEngineRef.floatingTexts.push(new FloatingText(gameEngineRef.player.x, gameEngineRef.player.y - 20, `-${Math.floor(this.damage * 0.6)}`, '#ff3131', 18));
+                    gameEngineRef.spawnBloodParticles(gameEngineRef.player.x, gameEngineRef.player.y, '#ff3131');
+                }
+            }
+        }
+    }
+
+    triggerBossCircularSlash(gameEngineRef) {
+        sounds.playShockwave();
+        // Visual pink circular wave
+        const wave = new HammerWave(this.x, this.y, 0, 160, '#ff007f', 0);
+        wave.is360 = true;
+        gameEngineRef.hammerWaves.push(wave);
+        
+        // Apply damage to player
+        const dist = Vector.dist(this.x, this.y, gameEngineRef.player.x, gameEngineRef.player.y);
+        if (dist < 160 + gameEngineRef.player.radius) {
+            const damaged = gameEngineRef.player.takeDamage(this.damage);
+            if (damaged) {
+                gameEngineRef.triggerScreenShake(12, 250);
+                gameEngineRef.floatingTexts.push(new FloatingText(gameEngineRef.player.x, gameEngineRef.player.y - 20, `-${this.damage}`, '#ff3131', 18));
+                gameEngineRef.spawnBloodParticles(gameEngineRef.player.x, gameEngineRef.player.y, '#ff3131');
+            }
+        }
+    }
+
     draw(ctx, camera) {
         const screenX = this.x - camera.x;
         const screenY = this.y - camera.y;
 
         ctx.save();
         ctx.translate(screenX, screenY);
-        ctx.rotate(this.angle + (this.bossState === 'BURST' ? Date.now() * 0.005 : 0)); // Xoay tròn khi bắn burst
+        ctx.rotate(this.angle + (this.bossState === 'BURST' ? Date.now() * 0.005 : 0));
 
         ctx.shadowBlur = 20;
         ctx.shadowColor = this.color;
         ctx.strokeStyle = this.color;
         ctx.lineWidth = 4;
-        ctx.fillStyle = 'rgba(20, 15, 5, 0.95)';
 
-        // Vẽ gai xung quanh lõi Boss khổng lồ
-        ctx.beginPath();
-        const spikeCount = 10;
-        for (let i = 0; i < spikeCount * 2; i++) {
-            const angle = (Math.PI / spikeCount) * i;
-            const dist = i % 2 === 0 ? this.radius : this.radius * 0.6;
-            const px = Math.cos(angle) * dist;
-            const py = Math.sin(angle) * dist;
-            if (i === 0) ctx.moveTo(px, py);
-            else ctx.lineTo(px, py);
+        if (this.bossType === 'yellow_intruder') {
+            ctx.fillStyle = 'rgba(20, 15, 5, 0.95)';
+            ctx.beginPath();
+            const spikeCount = 10;
+            for (let i = 0; i < spikeCount * 2; i++) {
+                const angle = (Math.PI / spikeCount) * i;
+                const dist = i % 2 === 0 ? this.radius : this.radius * 0.6;
+                const px = Math.cos(angle) * dist;
+                const py = Math.sin(angle) * dist;
+                if (i === 0) ctx.moveTo(px, py);
+                else ctx.lineTo(px, py);
+            }
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+            
+            // Inner core
+            ctx.fillStyle = this.color;
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(0, 0, this.radius * 0.3, 0, Math.PI * 2);
+            ctx.fill();
+        } 
+        else if (this.bossType === 'neon_vortex') {
+            ctx.beginPath();
+            const armCount = 6;
+            const angleOffset = Date.now() * 0.003;
+            for (let i = 0; i < armCount; i++) {
+                const baseAngle = (Math.PI * 2 / armCount) * i + angleOffset;
+                ctx.moveTo(0, 0);
+                const cpX = Math.cos(baseAngle + 0.5) * this.radius * 0.7;
+                const cpY = Math.sin(baseAngle + 0.5) * this.radius * 0.7;
+                const destX = Math.cos(baseAngle + 1.0) * this.radius;
+                const destY = Math.sin(baseAngle + 1.0) * this.radius;
+                ctx.quadraticCurveTo(cpX, cpY, destX, destY);
+            }
+            ctx.stroke();
+            
+            ctx.fillStyle = 'rgba(10, 5, 20, 0.9)';
+            ctx.beginPath();
+            ctx.arc(0, 0, this.radius * 0.65, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+            
+            ctx.fillStyle = this.color;
+            ctx.beginPath();
+            ctx.arc(0, 0, this.radius * 0.3 * (1 + Math.sin(Date.now() * 0.01) * 0.1), 0, Math.PI * 2);
+            ctx.fill();
+        } 
+        else if (this.bossType === 'synapse_reaper') {
+            ctx.fillStyle = 'rgba(20, 5, 15, 0.95)';
+            ctx.beginPath();
+            const bladeCount = 4;
+            const baseRot = Date.now() * 0.004;
+            for (let i = 0; i < bladeCount; i++) {
+                const angle = (Math.PI * 2 / bladeCount) * i + baseRot;
+                const tipX = Math.cos(angle) * this.radius * 1.3;
+                const tipY = Math.sin(angle) * this.radius * 1.3;
+                const leftX = Math.cos(angle - 0.4) * this.radius * 0.5;
+                const leftY = Math.sin(angle - 0.4) * this.radius * 0.5;
+                const rightX = Math.cos(angle + 0.4) * this.radius * 0.5;
+                const rightY = Math.sin(angle + 0.4) * this.radius * 0.5;
+                
+                if (i === 0) ctx.moveTo(leftX, leftY);
+                ctx.lineTo(tipX, tipY);
+                ctx.lineTo(rightX, rightY);
+            }
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+            
+            ctx.fillStyle = this.color;
+            ctx.beginPath();
+            ctx.arc(0, 0, this.radius * 0.25, 0, Math.PI * 2);
+            ctx.fill();
+        } 
+        else if (this.bossType === 'arch_overseer') {
+            ctx.fillStyle = 'rgba(5, 15, 20, 0.95)';
+            ctx.beginPath();
+            const sideCount = 8;
+            const rot = Date.now() * 0.001;
+            for (let i = 0; i < sideCount; i++) {
+                const angle = (Math.PI * 2 / sideCount) * i + rot;
+                const px = Math.cos(angle) * this.radius;
+                const py = Math.sin(angle) * this.radius;
+                if (i === 0) ctx.moveTo(px, py);
+                else ctx.lineTo(px, py);
+            }
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+            
+            ctx.strokeStyle = 'rgba(0, 240, 255, 0.4)';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            for (let i = 0; i < sideCount; i++) {
+                const angle = (Math.PI * 2 / sideCount) * i + rot;
+                ctx.moveTo(Math.cos(angle) * this.radius * 0.5, Math.sin(angle) * this.radius * 0.5);
+                ctx.lineTo(Math.cos(angle) * this.radius * 0.8, Math.sin(angle) * this.radius * 0.8);
+            }
+            ctx.stroke();
+            
+            ctx.fillStyle = this.color;
+            ctx.beginPath();
+            ctx.arc(0, 0, this.radius * 0.28, 0, Math.PI * 2);
+            ctx.fill();
+        } 
+        else if (this.bossType === 'grid_infection') {
+            const nodeCount = 5;
+            const tRot = Date.now() * 0.002;
+            
+            ctx.strokeStyle = this.color;
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            for (let i = 0; i < nodeCount; i++) {
+                const angle = (Math.PI * 2 / nodeCount) * i + tRot;
+                ctx.moveTo(0, 0);
+                ctx.lineTo(Math.cos(angle) * this.radius * 1.1, Math.sin(angle) * this.radius * 1.1);
+            }
+            ctx.stroke();
+            
+            for (let i = 0; i < nodeCount; i++) {
+                const angle = (Math.PI * 2 / nodeCount) * i + tRot;
+                const nx = Math.cos(angle) * this.radius * 1.1;
+                const ny = Math.sin(angle) * this.radius * 1.1;
+                
+                ctx.save();
+                ctx.translate(nx, ny);
+                ctx.fillStyle = 'rgba(20, 10, 0, 0.9)';
+                ctx.beginPath();
+                ctx.arc(0, 0, this.radius * 0.2, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+                ctx.restore();
+            }
+            
+            ctx.fillStyle = 'rgba(20, 10, 0, 0.95)';
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.arc(0, 0, this.radius * 0.7, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+            
+            ctx.fillStyle = this.color;
+            ctx.beginPath();
+            ctx.arc(0, 0, this.radius * 0.28, 0, Math.PI * 2);
+            ctx.fill();
         }
-        ctx.closePath();
-        ctx.fill();
-        ctx.stroke();
-
-        // Lõi năng lượng nhấp nháy bên trong Boss
-        ctx.fillStyle = this.color;
-        ctx.shadowBlur = 10;
-        ctx.shadowColor = '#ffffff';
-        ctx.beginPath();
-        ctx.arc(0, 0, this.radius * 0.3, 0, Math.PI * 2);
-        ctx.fill();
 
         ctx.restore();
+
+        // Vẽ Orbiting Shield của Neon Vortex
+        if (this.bossType === 'neon_vortex' && this.bossState === 'SHIELD_UP') {
+            const shieldCount = 3;
+            const shieldAngle = Date.now() * 0.005;
+            for (let i = 0; i < shieldCount; i++) {
+                const angle = shieldAngle + (Math.PI * 2 / shieldCount) * i;
+                const sx = this.x + Math.cos(angle) * 90;
+                const sy = this.y + Math.sin(angle) * 90;
+                
+                if (this.isInView(sx, sy, 15, camera)) {
+                    ctx.save();
+                    ctx.translate(sx - camera.x, sy - camera.y);
+                    ctx.rotate(Date.now() * 0.01 + i);
+                    ctx.shadowBlur = 10;
+                    ctx.shadowColor = '#b026ff';
+                    ctx.strokeStyle = '#b026ff';
+                    ctx.fillStyle = 'rgba(15, 10, 25, 0.85)';
+                    ctx.lineWidth = 2;
+                    
+                    ctx.beginPath();
+                    ctx.moveTo(15, 0);
+                    ctx.lineTo(0, -7);
+                    ctx.lineTo(-15, 0);
+                    ctx.lineTo(0, 7);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.stroke();
+                    ctx.restore();
+                }
+            }
+        }
+
+        // Vẽ Laser beams của Arch Overseer
+        if (this.bossType === 'arch_overseer' && this.bossState === 'LASER_BEAM') {
+            ctx.save();
+            ctx.translate(screenX, screenY);
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = '#00f0ff';
+            ctx.strokeStyle = 'rgba(0, 240, 255, 0.35)';
+            ctx.lineWidth = 14;
+            
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(Math.cos(this.laserAngle) * 800, Math.sin(this.laserAngle) * 800);
+            ctx.stroke();
+            
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(Math.cos(this.laserAngle + Math.PI) * 800, Math.sin(this.laserAngle + Math.PI) * 800);
+            ctx.stroke();
+            
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 3.5;
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(Math.cos(this.laserAngle) * 800, Math.sin(this.laserAngle) * 800);
+            ctx.moveTo(0, 0);
+            ctx.lineTo(Math.cos(this.laserAngle + Math.PI) * 800, Math.sin(this.laserAngle + Math.PI) * 800);
+            ctx.stroke();
+            
+            ctx.restore();
+        }
+    }
+
+    // Helper check view
+    isInView(x, y, radius, camera) {
+        return (
+            x + radius > camera.x &&
+            x - radius < camera.x + window.innerWidth &&
+            y + radius > camera.y &&
+            y - radius < camera.y + window.innerHeight
+        );
     }
 }
 
@@ -1286,16 +1923,17 @@ class HammerWave {
 
 // Sub-Weapon: Homing Missile (Tên lửa tầm nhiệt tự dẫn)
 class HomingMissile {
-    constructor(x, y, target, damage) {
+    constructor(x, y, target, damage, isEnemyMissile = false) {
         this.x = x;
         this.y = y;
         this.target = target;
         this.damage = damage;
-        this.speed = 8;
+        this.isEnemyMissile = isEnemyMissile;
+        this.speed = isEnemyMissile ? 5.5 : 8;
         this.radius = 6;
         this.angle = target ? Vector.angle(x, y, target.x, target.y) : 0;
         this.life = 4000; // Hủy sau 4 giây bay nếu không trúng gì
-        this.color = '#ff9f00'; // Neon Orange
+        this.color = isEnemyMissile ? '#ff3131' : '#ff9f00'; // Neon Orange cho player, Đỏ cho Boss
         this.trail = [];
     }
 
@@ -1308,9 +1946,13 @@ class HomingMissile {
             this.trail.shift();
         }
 
-        // Tìm mục tiêu mới nếu mục tiêu cũ chết hoặc không còn trong danh sách kẻ địch
-        if (!this.target || !enemies.includes(this.target) || this.target.hp <= 0) {
-            this.target = this.findNearestEnemy(enemies);
+        if (this.isEnemyMissile) {
+            this.target = gameEngine.player;
+        } else {
+            // Tìm mục tiêu mới nếu mục tiêu cũ chết hoặc không còn trong danh sách kẻ địch
+            if (!this.target || !enemies.includes(this.target) || this.target.hp <= 0) {
+                this.target = this.findNearestEnemy(enemies);
+            }
         }
 
         if (this.target) {
@@ -1779,8 +2421,9 @@ class Game {
         this.swordSlashes = [];
         this.hammerWaves = [];
         
-        // Hệ thống điều khiển Boss
-        this.bossSpawned = false;
+        // Hệ thống điều khiển Boss định kỳ
+        this.bossSpawnInterval = 90; // Xuất hiện Boss mỗi 90 giây
+        this.nextBossTime = 90;
         this.bossWarningActive = false;
         this.bossWarningTimer = 0;
         this.activeBoss = null;
@@ -2026,6 +2669,87 @@ class Game {
         this.shakeIntensity = intensity;
     }
 
+    onEnemyKilled(enemy, enemyIdx) {
+        if (enemy.type === 'mine') {
+            this.triggerMineExplosion(enemy.x, enemy.y);
+            this.enemies.splice(enemyIdx, 1);
+            return;
+        }
+
+        sounds.playExplosion();
+        this.kills++;
+        this.spawnBloodParticles(enemy.x, enemy.y, enemy.color, 12);
+        this.triggerScreenShake(4, 100);
+
+        const isBoss = (enemy instanceof Boss);
+        let isLastBoss = false;
+        
+        if (isBoss) {
+            if (enemy.silentDeath) {
+                // Do nothing, silent death from split
+            } else if (enemy.isClone) {
+                const otherClonesAlive = this.enemies.some(e => e instanceof Boss && e.bossType === 'grid_infection' && e.isClone && e !== enemy && e.hp > 0);
+                if (!otherClonesAlive) {
+                    isLastBoss = true;
+                }
+            } else {
+                isLastBoss = true;
+            }
+        }
+
+        if (isLastBoss) {
+            this.checkEnemyDeath(enemy);
+        } else if (isBoss && !enemy.silentDeath) {
+            this.spawnCollectable(enemy.x, enemy.y, enemy.xpValue * 1.5);
+        } else if (!isBoss) {
+            this.spawnCollectable(enemy.x, enemy.y, enemy.xpValue);
+        }
+
+        this.enemies.splice(enemyIdx, 1);
+    }
+
+    triggerMineExplosion(x, y) {
+        sounds.playExplosion();
+        this.triggerScreenShake(8, 150);
+        const expRadius = 100;
+        this.blastRings.push(new BlastRing(x, y, expRadius, '#ff9f00'));
+        
+        // Sát thương người chơi nếu trong tầm
+        const dist = Vector.dist(x, y, this.player.x, this.player.y);
+        if (dist < expRadius) {
+            const damaged = this.player.takeDamage(20);
+            if (damaged) {
+                this.floatingTexts.push(new FloatingText(this.player.x, this.player.y - 20, `-20`, '#ff3131', 18));
+                this.spawnBloodParticles(this.player.x, this.player.y, '#ff3131');
+            }
+        }
+        
+        for (let i = 0; i < 8; i++) {
+            this.particles.push(new Particle(x, y, '#ff9f00'));
+        }
+    }
+
+    triggerMissileExplosionForPlayer(x, y, damage) {
+        sounds.playExplosion();
+        this.triggerScreenShake(8, 200);
+
+        const expRadius = 90;
+        this.blastRings.push(new BlastRing(x, y, expRadius, '#ff3131'));
+
+        const dist = Vector.dist(x, y, this.player.x, this.player.y);
+        if (dist < expRadius) {
+            const damaged = this.player.takeDamage(damage);
+            if (damaged) {
+                this.floatingTexts.push(new FloatingText(this.player.x, this.player.y - 20, `-${Math.floor(damage)}`, '#ff3131', 18));
+                this.spawnBloodParticles(this.player.x, this.player.y, '#ff3131');
+            }
+        }
+
+        for (let i = 0; i < 10; i++) {
+            this.particles.push(new Particle(x, y, '#ff3131'));
+        }
+    }
+
     startGame() {
         // Tạo lại các thực thể
         this.player = new Player(this.worldSize / 2, this.worldSize / 2, this.selectedRole);
@@ -2055,8 +2779,8 @@ class Game {
         this.hammerWaves = [];
         this.activeShockwave = null;
 
-        // Reset trạng thái Boss
-        this.bossSpawned = false;
+        // Reset trạng thái Boss định kỳ
+        this.nextBossTime = 90;
         this.bossWarningActive = false;
         this.bossWarningTimer = 0;
         this.activeBoss = null;
@@ -2239,10 +2963,11 @@ class Game {
         // Cập nhật bộ đếm thời gian
         this.gameTime += deltaTime / 1000;
 
-        // Xử lý Cảnh báo Boss & Spawn Boss
-        if (this.gameTime >= 120 && !this.bossSpawned && !this.bossWarningActive) {
+        // Xử lý Cảnh báo Boss & Spawn Boss định kỳ mỗi 90 giây
+        if (this.gameTime >= this.nextBossTime && !this.bossWarningActive) {
             this.bossWarningActive = true;
             this.bossWarningTimer = 3000; // 3 giây nhấp nháy còi báo
+            this.nextBossTime += this.bossSpawnInterval; // Đặt mốc thời gian tiếp theo
             sounds.playLevelUp(); // Siren warning
         }
 
@@ -2256,25 +2981,40 @@ class Game {
             if (this.bossWarningTimer <= 0) {
                 if (warningOverlay) warningOverlay.classList.add('hidden');
                 this.bossWarningActive = false;
-                this.bossSpawned = true;
                 
                 // Spawn Boss ngay gần phi thuyền
                 const angle = Math.random() * Math.PI * 2;
                 const bx = this.player.x + Math.cos(angle) * 350;
                 const by = this.player.y + Math.sin(angle) * 350;
+                
+                // Chọn ngẫu nhiên loại Boss
                 this.activeBoss = new Boss(bx, by);
                 this.enemies.push(this.activeBoss);
                 sounds.playLevelUp();
             }
         }
 
-        // Cập nhật thanh HP Boss
+        // Cập nhật thanh HP Boss và Tên/Màu sắc động
         const bossHpContainer = document.getElementById('boss-hp-container');
         if (this.activeBoss && this.activeBoss.hp > 0) {
             if (bossHpContainer) {
                 bossHpContainer.classList.remove('hidden');
                 const bossHpPct = (this.activeBoss.hp / this.activeBoss.maxHp) * 100;
-                document.getElementById('boss-hp-fill').style.width = `${bossHpPct}%`;
+                
+                const hpFill = document.getElementById('boss-hp-fill');
+                if (hpFill) {
+                    hpFill.style.width = `${bossHpPct}%`;
+                    hpFill.style.backgroundColor = this.activeBoss.color;
+                    hpFill.style.boxShadow = `0 0 10px ${this.activeBoss.color}`;
+                }
+                
+                const bossNameEl = bossHpContainer.querySelector('.boss-name');
+                if (bossNameEl) {
+                    bossNameEl.textContent = `⚠️ CRITICAL TARGET: ${this.activeBoss.name} ⚠️`;
+                    bossNameEl.style.color = this.activeBoss.color;
+                    bossNameEl.style.textShadow = `0 0 5px ${this.activeBoss.color}`;
+                }
+                
                 document.getElementById('boss-hp-text').textContent = `${Math.ceil(this.activeBoss.hp)} / ${this.activeBoss.maxHp}`;
             }
         } else {
@@ -2521,7 +3261,21 @@ class Game {
                 // Đạn người chơi bắn trúng quái vật
                 for (let j = this.enemies.length - 1; j >= 0; j--) {
                     const enemy = this.enemies[j];
-                    if (Vector.dist(bullet.x, bullet.y, enemy.x, enemy.y) < bullet.radius + enemy.radius) {
+                    const dist = Vector.dist(bullet.x, bullet.y, enemy.x, enemy.y);
+                    
+                    // Khiên chắn phản/triệt tiêu đạn của Neon Vortex
+                    if (enemy instanceof Boss && enemy.bossType === 'neon_vortex' && enemy.bossState === 'SHIELD_UP') {
+                        if (dist < 95 + bullet.radius) {
+                            if (Math.random() < 0.6) { // 60% cơ hội triệt tiêu đạn
+                                this.bullets.splice(i, 1);
+                                bulletRemoved = true;
+                                this.spawnBloodParticles(bullet.x, bullet.y, '#b026ff', 3);
+                                break;
+                            }
+                        }
+                    }
+                    
+                    if (dist < bullet.radius + enemy.radius) {
                         this.damageEnemy(enemy, bullet.damage, bullet.vx, bullet.vy, j, bullet);
                         this.bullets.splice(i, 1);
                         bulletRemoved = true;
@@ -2650,9 +3404,20 @@ class Game {
             const enemy = this.enemies[i];
             enemy.update(this.player, this.bullets, deltaTime, this);
 
+            // Xử lý nổ mìn nếu mìn hết máu
+            if (enemy.type === 'mine' && enemy.hp <= 0) {
+                this.onEnemyKilled(enemy, i);
+                continue;
+            }
+
             // Va chạm chạm quái vật đè lên người chơi
             const dist = Vector.dist(enemy.x, enemy.y, this.player.x, this.player.y);
             if (dist < enemy.radius + this.player.radius) {
+                if (enemy.type === 'mine') {
+                    this.onEnemyKilled(enemy, i);
+                    continue;
+                }
+                
                 const damaged = this.player.takeDamage(enemy.damage);
                 if (damaged) {
                     this.triggerScreenShake(12, 250);
@@ -2668,6 +3433,9 @@ class Game {
             // Va chạm đẩy nhau giữa quái vật (Crowd Separation)
             for (let j = i - 1; j >= 0; j--) {
                 const other = this.enemies[j];
+                // Không đẩy mìn tĩnh
+                if (enemy.type === 'mine' || other.type === 'mine') continue;
+                
                 const d = Vector.dist(enemy.x, enemy.y, other.x, other.y);
                 const minDist = enemy.radius + other.radius;
                 if (d < minDist) {
@@ -2683,7 +3451,8 @@ class Game {
         }
 
         // Sinh quái vật tự động theo thời gian (Tạm dừng khi đang chiến đấu Boss)
-        if (!this.bossWarningActive && !this.activeBoss && this.bossDeathTimer <= 0) {
+        const hasBoss = this.enemies.some(e => e instanceof Boss);
+        if (!this.bossWarningActive && !hasBoss && this.bossDeathTimer <= 0) {
             this.spawnTimer += deltaTime;
             const adjustedInterval = Math.max(400, this.spawnInterval - Math.floor(this.gameTime / 15) * 80);
             
@@ -2756,7 +3525,12 @@ class Game {
         // Cập nhật tọa độ bay & va chạm của các tên lửa
         for (let i = this.homingMissiles.length - 1; i >= 0; i--) {
             const m = this.homingMissiles[i];
-            m.update(this.enemies, deltaTime, this);
+            
+            if (m.isEnemyMissile) {
+                m.update(null, deltaTime, this);
+            } else {
+                m.update(this.enemies, deltaTime, this);
+            }
 
             if (m.life <= 0 || m.x < 0 || m.x > this.worldSize || m.y < 0 || m.y > this.worldSize) {
                 this.homingMissiles.splice(i, 1);
@@ -2767,7 +3541,11 @@ class Game {
             let col = false;
             for (let p of this.pillars) {
                 if (Vector.dist(m.x, m.y, p.x, p.y) < m.radius + p.radius) {
-                    this.triggerMissileExplosion(m.x, m.y, m.damage);
+                    if (m.isEnemyMissile) {
+                        this.triggerMissileExplosionForPlayer(m.x, m.y, m.damage);
+                    } else {
+                        this.triggerMissileExplosion(m.x, m.y, m.damage);
+                    }
                     this.homingMissiles.splice(i, 1);
                     col = true;
                     break;
@@ -2779,7 +3557,11 @@ class Game {
             for (let j = this.barrels.length - 1; j >= 0; j--) {
                 const b = this.barrels[j];
                 if (Vector.dist(m.x, m.y, b.x, b.y) < m.radius + b.radius) {
-                    this.triggerMissileExplosion(m.x, m.y, m.damage);
+                    if (m.isEnemyMissile) {
+                        this.triggerMissileExplosionForPlayer(m.x, m.y, m.damage);
+                    } else {
+                        this.triggerMissileExplosion(m.x, m.y, m.damage);
+                    }
                     this.homingMissiles.splice(i, 1);
                     col = true;
                     b.hp--;
@@ -2792,13 +3574,20 @@ class Game {
             }
             if (col) continue;
 
-            // Va chạm quái vật thường/Boss
-            for (let j = this.enemies.length - 1; j >= 0; j--) {
-                const enemy = this.enemies[j];
-                if (Vector.dist(m.x, m.y, enemy.x, enemy.y) < m.radius + enemy.radius) {
-                    this.triggerMissileExplosion(m.x, m.y, m.damage);
+            // Va chạm thực thể người chơi hoặc quái vật tùy thuộc nguồn phóng
+            if (m.isEnemyMissile) {
+                if (Vector.dist(m.x, m.y, this.player.x, this.player.y) < m.radius + this.player.radius) {
+                    this.triggerMissileExplosionForPlayer(m.x, m.y, m.damage);
                     this.homingMissiles.splice(i, 1);
-                    break;
+                }
+            } else {
+                for (let j = this.enemies.length - 1; j >= 0; j--) {
+                    const enemy = this.enemies[j];
+                    if (Vector.dist(m.x, m.y, enemy.x, enemy.y) < m.radius + enemy.radius) {
+                        this.triggerMissileExplosion(m.x, m.y, m.damage);
+                        this.homingMissiles.splice(i, 1);
+                        break;
+                    }
                 }
             }
         }
@@ -2915,7 +3704,7 @@ class Game {
     }
 
     checkEnemyDeath(enemy) {
-        if (enemy === this.activeBoss) {
+        if (enemy instanceof Boss) {
             this.bossDeathTimer = 1500;
             this.bossDeathX = enemy.x;
             this.bossDeathY = enemy.y;
@@ -2976,16 +3765,7 @@ class Game {
         for (let j = this.enemies.length - 1; j >= 0; j--) {
             const enemy = this.enemies[j];
             if (enemy.hp <= 0) {
-                this.kills++;
-                this.spawnBloodParticles(enemy.x, enemy.y, enemy.color, 12);
-                
-                const isBoss = (enemy === this.activeBoss);
-                this.checkEnemyDeath(enemy);
-                if (!isBoss) {
-                    this.spawnCollectable(enemy.x, enemy.y, enemy.xpValue);
-                }
-                
-                this.enemies.splice(j, 1);
+                this.onEnemyKilled(enemy, j);
             }
         }
     }
@@ -3025,16 +3805,7 @@ class Game {
         for (let j = this.enemies.length - 1; j >= 0; j--) {
             const enemy = this.enemies[j];
             if (enemy.hp <= 0) {
-                this.kills++;
-                this.spawnBloodParticles(enemy.x, enemy.y, enemy.color, 12);
-                
-                const isBoss = (enemy === this.activeBoss);
-                this.checkEnemyDeath(enemy);
-                if (!isBoss) {
-                    this.spawnCollectable(enemy.x, enemy.y, enemy.xpValue);
-                }
-                
-                this.enemies.splice(j, 1);
+                this.onEnemyKilled(enemy, j);
             }
         }
 
@@ -3083,16 +3854,7 @@ class Game {
         for (let j = this.enemies.length - 1; j >= 0; j--) {
             const enemy = this.enemies[j];
             if (enemy.hp <= 0) {
-                this.kills++;
-                this.spawnBloodParticles(enemy.x, enemy.y, enemy.color, 12);
-                
-                const isBoss = (enemy === this.activeBoss);
-                this.checkEnemyDeath(enemy);
-                if (!isBoss) {
-                    this.spawnCollectable(enemy.x, enemy.y, enemy.xpValue);
-                }
-                
-                this.enemies.splice(j, 1);
+                this.onEnemyKilled(enemy, j);
             }
         }
 
@@ -3318,21 +4080,7 @@ class Game {
 
         // Kiểm tra xem quái vật chết chưa
         if (enemy.hp <= 0) {
-            sounds.playExplosion();
-            this.kills++;
-            
-            // Hiệu ứng nổ tanh bành
-            this.spawnBloodParticles(enemy.x, enemy.y, enemy.color, 12);
-            this.triggerScreenShake(4, 100);
-
-            // Rớt vật phẩm ngẫu nhiên tại vị trí quái chết (trừ Boss sẽ rơi rương riêng)
-            const isBoss = (enemy === this.activeBoss);
-            this.checkEnemyDeath(enemy);
-            if (!isBoss) {
-                this.spawnCollectable(enemy.x, enemy.y, enemy.xpValue);
-            }
-
-            this.enemies.splice(enemyIdx, 1);
+            this.onEnemyKilled(enemy, enemyIdx);
         } else {
             // Quái trúng đạn tạo âm thanh va đập nhỏ
             sounds.playHit();
@@ -3360,16 +4108,7 @@ class Game {
         for (let j = this.enemies.length - 1; j >= 0; j--) {
             const enemy = this.enemies[j];
             if (enemy.hp <= 0) {
-                this.kills++;
-                this.spawnBloodParticles(enemy.x, enemy.y, enemy.color, 12);
-                
-                const isBoss = (enemy === this.activeBoss);
-                this.checkEnemyDeath(enemy);
-                if (!isBoss) {
-                    this.spawnCollectable(enemy.x, enemy.y, enemy.xpValue);
-                }
-                
-                this.enemies.splice(j, 1);
+                this.onEnemyKilled(enemy, j);
             }
         }
     }
