@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Trải nghiệm Cyber Trigger - một game bắn súng 2D góc nhìn từ trên xuống phong cách Cyberpunk Neon hấp dẫn. Di chuyển, tiêu diệt quái vật, thu thập vật phẩm và thăng cấp sức mạnh.">
+    <title>Cyber Trigger - 2D Neon Top-Down Shooter</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <!-- Main Style Sheet -->
+  <script type="module" crossorigin src="./assets/index-Ba9SD9Ce.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-CcbReQVn.css">
+</head>
+<body>
+    <div id="game-container">
+        <!-- Canvas vẽ game -->
+        <canvas id="game-canvas"></canvas>
+
+        <!-- Hiệu ứng viền đỏ nhấp nháy khi yếu máu -->
+        <div id="low-hp-vignette" class="vignette-layer hidden"></div>
+
+        <!-- Lớp phủ HUD (Giao diện khi đang chơi) -->
+        <div id="game-hud" class="hud-layer hidden">
+            <div class="hud-top-bar">
+                <div class="xp-container">
+                    <span class="xp-label">LEVEL <span id="hud-level-val">1</span></span>
+                    <div class="xp-bar-bg">
+                        <div id="hud-xp-fill" class="xp-bar-fill" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Thanh máu Boss khổng lồ -->
+            <div id="boss-hp-container" class="boss-hp-layer hidden">
+                <div class="boss-hp-label-row">
+                    <span class="boss-name">⚠️ CRITICAL TARGET DETECTED ⚠️</span>
+                    <span id="boss-hp-text">1000 / 1000</span>
+                </div>
+                <div class="boss-hp-bar-bg">
+                    <div id="boss-hp-fill" class="boss-hp-bar-fill" style="width: 100%"></div>
+                </div>
+            </div>
+            
+            <div class="hud-stats-row">
+                <div class="stat-box">
+                    <span class="stat-icon">⏱️</span>
+                    <span id="hud-time-val">00:00</span>
+                </div>
+                <div class="stat-box">
+                    <span class="stat-icon">💀</span>
+                    <span id="hud-kills-val">0</span>
+                </div>
+            </div>
+
+            <div class="hud-bottom-bar">
+                <div class="health-container">
+                    <div class="health-text-row">
+                        <span class="health-label">HP</span>
+                        <span id="hud-hp-text">100 / 100</span>
+                    </div>
+                    <div class="health-bar-bg">
+                        <div id="hud-health-fill" class="health-bar-fill" style="width: 100%"></div>
+                    </div>
+                </div>
+                
+                <!-- HUD Kỹ năng active -->
+                <div class="hud-skills-container">
+                    <div class="skill-box" id="skill-dash">
+                        <div class="skill-cooldown-overlay" id="dash-cooldown-overlay"></div>
+                        <div class="skill-icon">🚀</div>
+                        <div class="skill-key">SPACE</div>
+                        <span class="skill-tooltip">LƯỚT (DASH)</span>
+                    </div>
+                    <div class="skill-box" id="skill-shockwave">
+                        <div class="skill-cooldown-overlay" id="shockwave-cooldown-overlay"></div>
+                        <div class="skill-icon">🌀</div>
+                        <div class="skill-key">E</div>
+                        <span class="skill-tooltip">SÓNG EMP</span>
+                    </div>
+                </div>
+
+                <div id="active-powerup" class="powerup-badge hidden">
+                    <span id="powerup-name">DOUBLE SHOT</span>: <span id="powerup-timer">5.0s</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Start Menu Overlay (Màn hình bắt đầu) -->
+        <div id="start-menu" class="overlay-layer">
+            <div class="menu-content glassmorphism">
+                <h1 class="game-title neon-pulse">CYBER<br><span class="neon-pink">TRIGGER</span></h1>
+                <p class="game-tagline">Tiêu diệt virus điện tử - Nâng cấp lõi năng lượng - Sống sót</p>
+                
+                <div class="how-to-play">
+                    <h3>HƯỚNG DẪN CHƠI</h3>
+                    <div class="controls-grid">
+                        <div class="control-item">
+                            <div class="key">W</div>
+                            <div class="key-row">
+                                <div class="key">A</div>
+                                <div class="key">S</div>
+                                <div class="key">D</div>
+                            </div>
+                            <span>Di chuyển</span>
+                        </div>
+                        <div class="control-item">
+                            <div class="mouse-icon">
+                                <div class="mouse-wheel"></div>
+                            </div>
+                            <span>Bấm giữ chuột để Bắn</span>
+                        </div>
+                        <div class="control-item">
+                            <div class="key space-key">SPACE</div>
+                            <span>Dash (Né đòn)</span>
+                        </div>
+                        <div class="control-item">
+                            <div class="key">E</div>
+                            <span>Kích hoạt Kỹ năng Hệ thống</span>
+                        </div>
+                    </div>
+                    <div class="pause-instruction" style="margin-top: 15px; padding-top: 10px; border-top: 1px dashed rgba(255, 255, 255, 0.1); font-size: 0.85rem; color: #cbd5e1; display: flex; justify-content: center; align-items: center; gap: 10px;">
+                        <span class="key" style="min-width: auto; padding: 4px 10px; margin: 0; box-shadow: 0 2px 0 #0f172a;">P</span>
+                        <span>Tạm dừng / Tiếp tục game (Pause)</span>
+                    </div>
+                </div>
+
+                <!-- Chọn vai trò RPG Class trước khi bắt đầu -->
+                <div class="role-selection-section">
+                    <h3>CHỌN VAI TRÒ HỆ THỐNG</h3>
+                    <div class="roles-grid">
+                        <div class="role-card selected" data-role="fighter">
+                            <div class="role-glow"></div>
+                            <div class="role-icon">🛡️</div>
+                            <h4>ĐẤU SĨ</h4>
+                            <div class="role-desc">Búa Vàng (Đẩy lùi)<br><span style="color: var(--neon-yellow); font-weight: 600;">E: Địa Chấn Vàng</span></div>
+                            <div class="role-stats-mini">
+                                <span>HP: 🟢🟢🟢🟢</span>
+                                <span>SPD: ⚡⚡</span>
+                            </div>
+                        </div>
+                        <div class="role-card" data-role="mage">
+                            <div class="role-glow"></div>
+                            <div class="role-icon">🔮</div>
+                            <h4>PHÁP SƯ</h4>
+                            <div class="role-desc">Cầu Ma Pháp (Lan tỏa)<br><span style="color: var(--neon-purple); font-weight: 600;">E: Chrono-Blink</span></div>
+                            <div class="role-stats-mini">
+                                <span>HP: 🟢🟢</span>
+                                <span>SPD: ⚡⚡⚡</span>
+                            </div>
+                        </div>
+                        <div class="role-card" data-role="ranger">
+                            <div class="role-glow"></div>
+                            <div class="role-icon">🎯</div>
+                            <h4>XẠ THỦ</h4>
+                            <div class="role-desc">Laser Xả (Tầm xa)<br><span style="color: var(--neon-blue); font-weight: 600;">E: Quá Tải Plasma</span></div>
+                            <div class="role-stats-mini">
+                                <span>HP: 🟢🟢🟢</span>
+                                <span>SPD: ⚡⚡</span>
+                            </div>
+                        </div>
+                        <div class="role-card" data-role="assassin">
+                            <div class="role-glow"></div>
+                            <div class="role-icon">🗡️</div>
+                            <h4>SÁT THỦ</h4>
+                            <div class="role-desc">Quét Kiếm (Tự động)<br><span style="color: var(--neon-pink); font-weight: 600;">E: Vô Ảnh Kích</span></div>
+                            <div class="role-stats-mini">
+                                <span>HP: 🟢</span>
+                                <span>SPD: ⚡⚡⚡⚡⚡</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <button id="btn-start-game" class="btn-neon neon-blue-border">BẮT ĐẦU CHƠI</button>
+            </div>
+        </div>
+
+        <!-- Upgrade Selection Menu Overlay (Màn hình chọn nâng cấp khi thăng cấp) -->
+        <div id="upgrade-menu" class="overlay-layer hidden">
+            <div class="upgrade-container">
+                <h2 class="upgrade-title neon-pulse-pink">LỰA CHỌN CẢI TIẾN LÕI</h2>
+                <p class="upgrade-subtitle">Năng lượng đầy! Hãy chọn 1 nâng cấp bên dưới để tiếp tục</p>
+                <div id="upgrade-choices" class="choices-grid">
+                    <!-- Thẻ nâng cấp sẽ được chèn ngẫu nhiên bởi game.js -->
+                    <div class="upgrade-card glassmorphism-card" onclick="selectUpgrade(0)">
+                        <div class="card-glow-blue"></div>
+                        <div class="card-icon">⚡</div>
+                        <h3>Tăng tốc độ bắn</h3>
+                        <p>Tăng tốc độ xả đạn lên 20% giúp dọn quái nhanh hơn.</p>
+                        <span class="card-stat">+20% Fire Rate</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Màn hình Cảnh báo Boss xuất hiện -->
+        <div id="boss-warning-overlay" class="overlay-layer hidden boss-warning-layer">
+            <div class="boss-warning-box">
+                <h1 class="boss-warning-title neon-pulse-red">⚠️ SYSTEM INTRUSION ⚠️</h1>
+                <div class="boss-warning-msg">GIANT VIRUS DETECTED IN SECTOR</div>
+                <div id="boss-warning-countdown" class="boss-warning-timer">3</div>
+            </div>
+        </div>
+
+        <!-- Màn hình Chọn Lõi Siêu Cấp từ Rương Boss -->
+        <div id="super-upgrade-menu" class="overlay-layer hidden">
+            <div class="upgrade-container">
+                <h2 class="upgrade-title neon-pulse-yellow">TÍCH HỢP LÕI SIÊU CẤP</h2>
+                <p class="upgrade-subtitle">Kích hoạt rương thành công! Chọn 1 Vũ khí phụ đặc biệt để nâng cấp hệ thống</p>
+                <div id="super-upgrade-choices" class="choices-grid">
+                    <!-- Được sinh động bởi game.js -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Màn hình Tạm dừng Game (Pause Menu) -->
+        <div id="pause-menu" class="overlay-layer hidden">
+            <div class="menu-content glassmorphism">
+                <h2 class="game-title neon-pulse">TẠM DỪNG</h2>
+                <p class="game-tagline">Hệ thống tạm thời ngưng kích hoạt. Nhấn 'P' hoặc click để tiếp tục.</p>
+                <div style="display: flex; flex-direction: column; gap: 15px; width: 100%; align-items: center; margin-top: 25px;">
+                    <button id="btn-resume-game" class="btn-neon neon-blue-border" style="width: 80%; max-width: 320px;">TIẾP TỤC CHƠI</button>
+                    <button id="btn-back-to-menu" class="btn-neon neon-pink-border" style="width: 80%; max-width: 320px;">CHỌN LẠI VAI TRÒ</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Game Over Menu Overlay (Màn hình kết thúc) -->
+        <div id="game-over-menu" class="overlay-layer hidden">
+            <div class="menu-content glassmorphism">
+                <h2 class="game-over-title neon-pulse-red">KẾT THÚC CHƯƠNG TRÌNH</h2>
+                <p class="game-over-subtitle">Bạn đã bị các virus phá hủy hệ thống</p>
+                
+                <div class="final-stats">
+                    <div class="final-stat-item">
+                        <span class="stat-label">Thời gian sống sót:</span>
+                        <span id="final-time" class="stat-val">02:45</span>
+                    </div>
+                    <div class="final-stat-item">
+                        <span class="stat-label">Số quái tiêu diệt:</span>
+                        <span id="final-kills" class="stat-val">124</span>
+                    </div>
+                    <div class="final-stat-item">
+                        <span class="stat-label">Cấp độ đạt được:</span>
+                        <span id="final-level" class="stat-val">Level 8</span>
+                    </div>
+                </div>
+
+                <div class="leaderboard-section">
+                    <h3>BẢNG XẾP HẠNG</h3>
+                    <ol id="leaderboard-list">
+                        <!-- Danh sách điểm cao sẽ được load từ localStorage -->
+                    </ol>
+                </div>
+
+                <button id="btn-restart-game" class="btn-neon neon-pink-border">BẮT ĐẦU LẠI</button>
+            </div>
+        </div>
+
+        <!-- Nút bật/tắt âm thanh nhanh -->
+        <button id="btn-audio-toggle" class="audio-toggle-btn" aria-label="Bật/Tắt âm thanh">🔊</button>
+    </div>
+
+    <!-- Main Game Script -->
+</body>
+</html>
