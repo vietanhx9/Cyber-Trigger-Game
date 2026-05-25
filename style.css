@@ -66,7 +66,7 @@ canvas {
     z-index: 10;
     display: flex;
     justify-content: center;
-    align-items: center;
+    align-items: center; /* Center the panel vertically and horizontally */
     background: rgba(4, 6, 12, 0.85);
     backdrop-filter: blur(8px);
     transition: opacity 0.4s ease, visibility 0.4s ease;
@@ -86,10 +86,32 @@ canvas {
     padding: 40px;
     max-width: 600px;
     width: 90%;
+    max-height: 92vh; /* Constrain panel height so it never overflows screen height */
+    overflow-y: auto; /* Enable scroll inside the card if contents exceed max-height */
     text-align: center;
     box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5), inset 0 0 1px 1px rgba(255, 255, 255, 0.05);
     backdrop-filter: blur(20px) saturate(180%);
     animation: scaleIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    scrollbar-width: thin;
+    scrollbar-color: var(--neon-blue) rgba(10, 15, 30, 0.5);
+}
+
+/* Custom Scrollbar for scrollable glassmorphism panels */
+.glassmorphism::-webkit-scrollbar {
+    width: 8px;
+}
+.glassmorphism::-webkit-scrollbar-track {
+    background: rgba(10, 15, 30, 0.5);
+    border-radius: 4px;
+}
+.glassmorphism::-webkit-scrollbar-thumb {
+    background: var(--neon-blue);
+    border-radius: 4px;
+    box-shadow: 0 0 10px var(--neon-blue);
+}
+.glassmorphism::-webkit-scrollbar-thumb:hover {
+    background: var(--neon-pink);
+    box-shadow: 0 0 10px var(--neon-pink);
 }
 
 @keyframes scaleIn {
@@ -510,9 +532,32 @@ canvas {
 .upgrade-container {
     max-width: 1000px;
     width: 90%;
+    max-height: 92vh; /* Limit height */
+    overflow-y: auto; /* Scroll inside panel */
     text-align: center;
     z-index: 11;
     animation: scaleIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    scrollbar-width: thin;
+    scrollbar-color: var(--neon-blue) rgba(10, 15, 30, 0.5);
+    padding: 15px; /* Prevent shadows from clipping */
+}
+
+/* Custom Scrollbar for scrollable upgrade panels */
+.upgrade-container::-webkit-scrollbar {
+    width: 8px;
+}
+.upgrade-container::-webkit-scrollbar-track {
+    background: rgba(10, 15, 30, 0.5);
+    border-radius: 4px;
+}
+.upgrade-container::-webkit-scrollbar-thumb {
+    background: var(--neon-blue);
+    border-radius: 4px;
+    box-shadow: 0 0 10px var(--neon-blue);
+}
+.upgrade-container::-webkit-scrollbar-thumb:hover {
+    background: var(--neon-pink);
+    box-shadow: 0 0 10px var(--neon-pink);
 }
 
 .upgrade-title {
@@ -882,6 +927,63 @@ canvas {
     }
 }
 
+/* Height-based media query for smaller viewports (e.g. non-fullscreen) */
+@media (max-height: 820px) {
+    .glassmorphism {
+        padding: 20px 30px;
+    }
+    .neon-pulse {
+        font-size: 2.5rem;
+        margin-bottom: 5px;
+    }
+    .game-tagline {
+        margin-bottom: 15px;
+        font-size: 0.9rem;
+    }
+    .how-to-play {
+        padding: 12px 20px;
+        margin-bottom: 15px;
+    }
+    .controls-grid {
+        gap: 10px;
+    }
+    .control-item {
+        font-size: 0.8rem;
+    }
+    .mouse-icon {
+        height: 40px;
+        width: 26px;
+    }
+    .mouse-wheel {
+        height: 8px;
+        top: 6px;
+    }
+    .role-selection-section {
+        margin: 10px 0 15px 0;
+    }
+    .roles-grid {
+        gap: 8px;
+        margin-bottom: 10px;
+    }
+    .role-card {
+        padding: 8px 4px;
+    }
+    .role-card .role-icon {
+        font-size: 1.4rem;
+        margin-bottom: 4px;
+    }
+    .role-card h4 {
+        font-size: 0.75rem;
+    }
+    .role-desc {
+        font-size: 0.6rem;
+    }
+    .btn-neon {
+        padding: 10px 28px;
+        font-size: 1rem;
+    }
+}
+
 /* --- NEW UPGRADED STYLES FOR BOSS & SUB-WEAPONS --- */
 
 /* 1. Low HP Vignette Layer */
@@ -983,6 +1085,7 @@ canvas {
     animation: warningBoxPulse 1s infinite alternate;
     max-width: 500px;
     width: 90%;
+    margin: auto;
 }
 
 @keyframes warningBoxPulse {
