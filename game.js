@@ -502,6 +502,12 @@ class Player {
         this.droneTimer = 0;
         this.droneX = x;
         this.droneY = y;
+
+        // Trạng thái kỹ năng kích hoạt riêng biệt của các vai trò (RPG active skills)
+        this.plasmaOverloadTimer = 0; // Xạ thủ
+        this.shadowDashTimer = 0; // Sát thủ
+        this.shadowDashAngle = 0; // Sát thủ
+        this.shadowDashHitEnemies = new Set(); // Sát thủ
     }
 
     update(keys, mouse, canvasWidth, canvasHeight, camera, deltaTime) {
@@ -521,10 +527,16 @@ class Player {
             this.ghostTrails = this.ghostTrails.filter(gt => gt.alpha > 0);
         }
 
+        // Cập nhật bộ đếm thời gian kỹ năng active đặc biệt
+        if (this.plasmaOverloadTimer > 0) this.plasmaOverloadTimer -= deltaTime;
+        
         // Tính tốc độ hiện tại (có tính Speed Boost powerup)
         let currentSpeed = this.speed;
         if (this.powerups.speedBoost > 0) {
             currentSpeed *= 1.5;
+        }
+        if (this.plasmaOverloadTimer > 0) {
+            currentSpeed *= 1.6; // Xạ thủ tăng tốc khi bật Quá tải Plasma
         }
 
         // Giảm 30% tốc độ di chuyển khi có động đất đang hoạt động
@@ -532,22 +544,45 @@ class Player {
             currentSpeed *= 0.7;
         }
 
-        // Di chuyển dựa trên phím nhấn
-        let dx = 0;
-        let dy = 0;
-        if (keys['w'] || keys['arrowup']) dy -= 1;
-        if (keys['s'] || keys['arrowdown']) dy += 1;
-        if (keys['a'] || keys['arrowleft']) dx -= 1;
-        if (keys['d'] || keys['arrowright']) dx += 1;
+        // Di chuyển tự động khi đang lướt Shadow Dash (Sát thủ)
+        if (this.shadowDashTimer > 0) {
+            this.shadowDashTimer -= deltaTime;
+            if (this.shadowDashTimer < 0) this.shadowDashTimer = 0;
+            
+            const dashSpeed = 16.0;
+            this.x += Math.cos(this.shadowDashAngle) * dashSpeed * (deltaTime / 16.67);
+            this.y += Math.sin(this.shadowDashAngle) * dashSpeed * (deltaTime / 16.67);
+            
+            // Luôn duy trì bất tử trong suốt quá trình lướt
+            this.iframe = Math.max(this.iframe, 100);
+            
+            // Thêm bóng mờ tần suất cao
+            if (Math.floor(Date.now() / 25) % 2 === 0) {
+                this.ghostTrails.push({
+                    x: this.x,
+                    y: this.y,
+                    angle: this.shadowDashAngle,
+                    alpha: 0.85
+                });
+            }
+        } else {
+            // Di chuyển dựa trên phím nhấn
+            let dx = 0;
+            let dy = 0;
+            if (keys['w'] || keys['arrowup']) dy -= 1;
+            if (keys['s'] || keys['arrowdown']) dy += 1;
+            if (keys['a'] || keys['arrowleft']) dx -= 1;
+            if (keys['d'] || keys['arrowright']) dx += 1;
 
-        // Chuẩn hóa vector di chuyển chéo để không bị nhanh hơn
-        if (dx !== 0 && dy !== 0) {
-            dx *= 0.7071;
-            dy *= 0.7071;
+            // Chuẩn hóa vector di chuyển chéo để không bị nhanh hơn
+            if (dx !== 0 && dy !== 0) {
+                dx *= 0.7071;
+                dy *= 0.7071;
+            }
+
+            this.x += dx * currentSpeed;
+            this.y += dy * currentSpeed;
         }
-
-        this.x += dx * currentSpeed;
-        this.y += dy * currentSpeed;
 
         // Giới hạn trong bản đồ thế giới (World size = 3000x3000px)
         const margin = this.radius + 10;
@@ -636,6 +671,23 @@ class Player {
 
         ctx.save();
         ctx.translate(screenX, screenY);
+
+        // Vẽ hiệu ứng sấm sét/điện trường cyan xoay tròn khi Ranger bật Quá Tải Plasma
+        if (this.plasmaOverloadTimer > 0) {
+            ctx.save();
+            ctx.rotate(Date.now() * 0.008);
+            ctx.strokeStyle = '#00f0ff';
+            ctx.lineWidth = 2.5;
+            ctx.globalAlpha = 0.5 + Math.sin(Date.now() * 0.025) * 0.3;
+            for (let i = 0; i < 4; i++) {
+                ctx.rotate(Math.PI / 2);
+                ctx.beginPath();
+                ctx.arc(0, 0, this.radius * 1.6, -0.3, 0.3);
+                ctx.stroke();
+            }
+            ctx.restore();
+        }
+
         ctx.rotate(this.angle);
 
         // Hiệu ứng phát sáng neon cho nhân vật (Double-stroke outer glow)
@@ -848,6 +900,7 @@ class Enemy {
         this.knockbackX = 0;
         this.knockbackY = 0;
         this.shootTimer = Math.random() * 2000; // Timer ngẫu nhiên ban đầu cho quái bắn
+        this.stunTimer = 0; // Bộ đếm thời gian choáng (stun) từ kỹ năng Đấu sĩ
 
         // Xác định loại quái vật
         if (!type) {
@@ -928,6 +981,15 @@ class Enemy {
         this.y += this.knockbackY;
         this.knockbackX *= 0.8;
         this.knockbackY *= 0.8;
+
+        if (this.stunTimer > 0) {
+            this.stunTimer -= deltaTime;
+            if (this.stunTimer < 0) this.stunTimer = 0;
+            // Vẫn giới hạn trong bản đồ thế giới đề phòng bị đẩy lùi vượt biên
+            this.x = Math.max(this.radius, Math.min(3000 - this.radius, this.x));
+            this.y = Math.max(this.radius, Math.min(3000 - this.radius, this.y));
+            return;
+        }
 
         if (this.type === 'mine') {
             return;
@@ -3467,6 +3529,35 @@ class Game {
             xpFill.style.boxShadow = `0 0 10px ${this.player.color}`;
         }
 
+        // Cập nhật tooltip và icon của kỹ năng active E trên HUD theo vai trò
+        const skillShockwave = document.getElementById('skill-shockwave');
+        if (skillShockwave) {
+            const skillIcon = skillShockwave.querySelector('.skill-icon');
+            const skillTooltip = skillShockwave.querySelector('.skill-tooltip');
+            
+            if (this.selectedRole === 'fighter') {
+                if (skillIcon) skillIcon.textContent = '🔨';
+                if (skillTooltip) skillTooltip.textContent = 'ĐỊA CHẤN VÀNG (E)';
+                skillShockwave.style.borderColor = '#fffb00';
+                skillShockwave.style.boxShadow = 'inset 0 0 8px rgba(255, 251, 0, 0.2), 0 0 12px rgba(255, 251, 0, 0.4)';
+            } else if (this.selectedRole === 'mage') {
+                if (skillIcon) skillIcon.textContent = '🔮';
+                if (skillTooltip) skillTooltip.textContent = 'CHRONO-BLINK (E)';
+                skillShockwave.style.borderColor = '#b026ff';
+                skillShockwave.style.boxShadow = 'inset 0 0 8px rgba(176, 38, 255, 0.2), 0 0 12px rgba(176, 38, 255, 0.4)';
+            } else if (this.selectedRole === 'ranger') {
+                if (skillIcon) skillIcon.textContent = '⚡';
+                if (skillTooltip) skillTooltip.textContent = 'QUÁ TẢI PLASMA (E)';
+                skillShockwave.style.borderColor = '#00f0ff';
+                skillShockwave.style.boxShadow = 'inset 0 0 8px rgba(0, 240, 255, 0.2), 0 0 12px rgba(0, 240, 255, 0.4)';
+            } else if (this.selectedRole === 'assassin') {
+                if (skillIcon) skillIcon.textContent = '🗡️';
+                if (skillTooltip) skillTooltip.textContent = 'VÔ ẢNH KÍCH (E)';
+                skillShockwave.style.borderColor = '#ff007f';
+                skillShockwave.style.boxShadow = 'inset 0 0 8px rgba(255, 0, 127, 0.2), 0 0 12px rgba(255, 0, 127, 0.4)';
+            }
+        }
+
         this.enemies = [];
         this.bullets = [];
         this.items = [];
@@ -3478,7 +3569,7 @@ class Game {
         this.homingMissiles = [];
         this.swordSlashes = [];
         this.hammerWaves = [];
-        this.activeShockwave = null;
+        this.activeShockwaves = [];
 
         // Reset trạng thái Boss định kỳ
         this.nextBossTime = 60;
@@ -3850,11 +3941,12 @@ class Game {
             this.triggerShockwave();
         }
 
-        // Cập nhật Shockwave nổ EMP nếu có hoạt động
-        if (this.activeShockwave) {
-            this.activeShockwave.currentRadius += this.activeShockwave.speed * (deltaTime / 16.67) * 4.5;
-            if (this.activeShockwave.currentRadius >= this.activeShockwave.maxRadius) {
-                this.activeShockwave = null;
+        // Cập nhật Sóng Chấn Động nếu có hoạt động
+        for (let i = this.activeShockwaves.length - 1; i >= 0; i--) {
+            const wave = this.activeShockwaves[i];
+            wave.currentRadius += wave.speed * (deltaTime / 16.67) * 4.5;
+            if (wave.currentRadius >= wave.maxRadius) {
+                this.activeShockwaves.splice(i, 1);
             }
         }
 
@@ -3868,6 +3960,48 @@ class Game {
 
         // Cập nhật người chơi
         this.player.update(this.keys, this.mouse, this.canvas.width, this.canvas.height, this.camera, deltaTime);
+
+        // Xử lý càn quét trong Shadow Dash của Sát thủ
+        if (this.player.role === 'assassin' && this.player.shadowDashTimer > 0) {
+            const dashReach = this.player.radius + 40;
+            
+            // 1. Phá hủy đạn địch xung quanh đường lướt
+            this.bullets = this.bullets.filter(bullet => {
+                if (!bullet.isPlayerBullet) {
+                    const dist = Vector.dist(this.player.x, this.player.y, bullet.x, bullet.y);
+                    if (dist < dashReach + bullet.radius) {
+                        this.spawnBloodParticles(bullet.x, bullet.y, '#ff3131', 2);
+                        return false;
+                    }
+                }
+                return true;
+            });
+
+            // 2. Chém và gây sát thương lớn lên quái vật chạm phải
+            for (let j = this.enemies.length - 1; j >= 0; j--) {
+                const enemy = this.enemies[j];
+                if (this.player.shadowDashHitEnemies && !this.player.shadowDashHitEnemies.has(enemy)) {
+                    const dist = Vector.dist(this.player.x, this.player.y, enemy.x, enemy.y);
+                    if (dist < dashReach + enemy.radius) {
+                        this.player.shadowDashHitEnemies.add(enemy);
+                        
+                        // Sát thương 70 (scaled theo nâng cấp damage)
+                        const dashDamage = Math.floor(70 * (1 + this.player.upgrades.damage * 0.25));
+                        this.damageEnemy(enemy, dashDamage, Math.cos(this.player.shadowDashAngle) * 5, Math.sin(this.player.shadowDashAngle) * 5, j);
+                        
+                        // Hiệu ứng chém kiếm pink neon đẹp mắt
+                        sounds.playSwordSlash();
+                        this.swordSlashes.push(new SwordSlash(
+                            enemy.x, enemy.y, 
+                            this.player.shadowDashAngle + (Math.random() - 0.5) * 0.5, 
+                            enemy.radius + 20, 
+                            '#ff007f', 
+                            0 // Sát thương đã được tính trực tiếp
+                        ));
+                    }
+                }
+            }
+        }
 
         // Xử lý va chạm chướng ngại vật cho Người chơi (Pillars và Barrels)
         this.pillars.forEach(p => {
@@ -3916,7 +4050,10 @@ class Game {
         });
 
         const now = performance.now();
-        const modifiedFireRate = this.player.fireRate * Math.pow(0.8, this.player.upgrades.fireRate);
+        let modifiedFireRate = this.player.fireRate * Math.pow(0.8, this.player.upgrades.fireRate);
+        if (this.player.plasmaOverloadTimer > 0) {
+            modifiedFireRate /= 3.0; // Bắn nhanh gấp 3 lần khi bật Quá tải Plasma
+        }
 
         // 1. Tự động cận chiến quét kiếm khi quái tới gần cho Sát thủ (Assassin)
         if (this.player.role === 'assassin') {
@@ -4511,53 +4648,185 @@ class Game {
         // Thiết lập hồi chiêu
         this.player.shockwaveCooldown = this.player.shockwaveCooldownMax;
 
-        // Tạo một đối tượng Shockwave trong game để vẽ vòng tròn nở ra
-        const waveRadius = 250;
-        this.activeShockwave = {
-            x: this.player.x,
-            y: this.player.y,
-            currentRadius: 0,
-            maxRadius: waveRadius,
-            speed: 8, // Tốc độ lan ra
-            color: '#b026ff' // Tím neon
-        };
+        const role = this.player.role || 'fighter';
 
-        sounds.playShockwave();
-        this.triggerScreenShake(15, 300);
+        if (role === 'fighter') {
+            const waveRadius = 320;
+            this.activeShockwaves.push({
+                x: this.player.x,
+                y: this.player.y,
+                currentRadius: 0,
+                maxRadius: waveRadius,
+                speed: 8,
+                color: '#fffb00'
+            });
 
-        // 1. Phá đạn địch trong phạm vi 250px
-        this.bullets = this.bullets.filter(bullet => {
-            if (!bullet.isPlayerBullet) {
-                const dist = Vector.dist(this.player.x, this.player.y, bullet.x, bullet.y);
+            sounds.playExplosion();
+            this.triggerScreenShake(20, 350);
+
+            // Phá hủy đạn địch
+            this.bullets = this.bullets.filter(bullet => {
+                if (!bullet.isPlayerBullet) {
+                    const dist = Vector.dist(this.player.x, this.player.y, bullet.x, bullet.y);
+                    if (dist < waveRadius) {
+                        this.spawnBloodParticles(bullet.x, bullet.y, '#ff3131', 3);
+                        return false;
+                    }
+                }
+                return true;
+            });
+
+            // Gây sát thương (60), đẩy lùi mạnh (25) và choáng (1.5s)
+            for (let j = this.enemies.length - 1; j >= 0; j--) {
+                const enemy = this.enemies[j];
+                const dist = Vector.dist(this.player.x, this.player.y, enemy.x, enemy.y);
                 if (dist < waveRadius) {
-                    // Sinh hạt nổ đạn
-                    this.spawnBloodParticles(bullet.x, bullet.y, '#ff3131', 3);
-                    return false; // Hủy đạn
+                    const angle = Vector.angle(this.player.x, this.player.y, enemy.x, enemy.y);
+                    enemy.stunTimer = 1500; // 1.5 giây choáng
+                    const damage = Math.floor(60 * (1 + this.player.upgrades.damage * 0.25));
+                    this.damageEnemy(enemy, damage, Math.cos(angle) * 25, Math.sin(angle) * 25, j, { isHeavy: true });
                 }
             }
-            return true;
-        });
+        } else if (role === 'ranger') {
+            const waveRadius = 160;
+            this.activeShockwaves.push({
+                x: this.player.x,
+                y: this.player.y,
+                currentRadius: 0,
+                maxRadius: waveRadius,
+                speed: 10,
+                color: '#00f0ff'
+            });
 
-        // 2. Đẩy lùi toàn bộ quái trong phạm vi 250px và gây sát thương
-        this.enemies.forEach((enemy) => {
-            const dist = Vector.dist(this.player.x, this.player.y, enemy.x, enemy.y);
-            if (dist < waveRadius) {
-                const angle = Vector.angle(this.player.x, this.player.y, enemy.x, enemy.y);
-                // Sát thương EMP cố định
-                enemy.hp -= 25;
-                // Đẩy lùi cực mạnh
-                enemy.applyKnockback(angle, 18);
-                this.floatingTexts.push(new FloatingText(enemy.x, enemy.y - 10, '25', '#b026ff', 15));
-                this.spawnBloodParticles(enemy.x, enemy.y, enemy.color, 5);
+            sounds.playShockwave();
+            this.triggerScreenShake(8, 200);
+
+            // Dọn dẹp đạn xung quanh
+            this.bullets = this.bullets.filter(bullet => {
+                if (!bullet.isPlayerBullet) {
+                    const dist = Vector.dist(this.player.x, this.player.y, bullet.x, bullet.y);
+                    if (dist < waveRadius) {
+                        this.spawnBloodParticles(bullet.x, bullet.y, '#ff3131', 2);
+                        return false;
+                    }
+                }
+                return true;
+            });
+
+            // Đẩy nhẹ quái ra
+            for (let j = this.enemies.length - 1; j >= 0; j--) {
+                const enemy = this.enemies[j];
+                const dist = Vector.dist(this.player.x, this.player.y, enemy.x, enemy.y);
+                if (dist < waveRadius) {
+                    const angle = Vector.angle(this.player.x, this.player.y, enemy.x, enemy.y);
+                    const damage = Math.floor(15 * (1 + this.player.upgrades.damage * 0.25));
+                    this.damageEnemy(enemy, damage, Math.cos(angle) * 6, Math.sin(angle) * 6, j);
+                }
             }
-        });
-        
-        // Cập nhật lại danh sách kẻ địch (chỉ giữ lại những quái còn sống)
-        for (let j = this.enemies.length - 1; j >= 0; j--) {
-            const enemy = this.enemies[j];
-            if (enemy.hp <= 0) {
-                this.onEnemyKilled(enemy, j);
+
+            // Kích hoạt trạng thái quá tải
+            this.player.plasmaOverloadTimer = 4000;
+        } else if (role === 'mage') {
+            let blinkAngle = this.player.angle; // default to mouse direction
+            let dx = 0;
+            let dy = 0;
+            if (this.keys['w'] || this.keys['arrowup']) dy -= 1;
+            if (this.keys['s'] || this.keys['arrowdown']) dy += 1;
+            if (this.keys['a'] || this.keys['arrowleft']) dx -= 1;
+            if (this.keys['d'] || this.keys['arrowright']) dx += 1;
+            if (dx !== 0 || dy !== 0) {
+                blinkAngle = Math.atan2(dy, dx);
             }
+
+            const blinkDist = 200;
+            const startX = this.player.x;
+            const startY = this.player.y;
+
+            const targetX = startX + Math.cos(blinkAngle) * blinkDist;
+            const targetY = startY + Math.sin(blinkAngle) * blinkDist;
+
+            const margin = this.player.radius + 15;
+            const finalX = Math.max(margin, Math.min(3000 - margin, targetX));
+            const finalY = Math.max(margin, Math.min(3000 - margin, targetY));
+
+            // Sóng nổ xuất phát
+            this.activeShockwaves.push({
+                x: startX,
+                y: startY,
+                currentRadius: 0,
+                maxRadius: 160,
+                speed: 12,
+                color: '#b026ff'
+            });
+            this.spawnBloodParticles(startX, startY, '#b026ff', 8);
+
+            // Dịch chuyển
+            this.player.x = finalX;
+            this.player.y = finalY;
+
+            // Sóng nổ điểm đến
+            this.activeShockwaves.push({
+                x: finalX,
+                y: finalY,
+                currentRadius: 0,
+                maxRadius: 220,
+                speed: 10,
+                color: '#b026ff'
+            });
+            this.spawnBloodParticles(finalX, finalY, '#b026ff', 12);
+
+            sounds.playShockwave();
+            this.triggerScreenShake(12, 250);
+
+            // Phá đạn ở cả 2 khu vực
+            this.bullets = this.bullets.filter(bullet => {
+                if (!bullet.isPlayerBullet) {
+                    const distStart = Vector.dist(startX, startY, bullet.x, bullet.y);
+                    const distEnd = Vector.dist(finalX, finalY, bullet.x, bullet.y);
+                    if (distStart < 160 || distEnd < 220) {
+                        this.spawnBloodParticles(bullet.x, bullet.y, '#ff3131', 2);
+                        return false;
+                    }
+                }
+                return true;
+            });
+
+            // Gây sát thương và đẩy quái ở cả 2 khu vực
+            for (let j = this.enemies.length - 1; j >= 0; j--) {
+                const enemy = this.enemies[j];
+                const distStart = Vector.dist(startX, startY, enemy.x, enemy.y);
+                if (distStart < 160) {
+                    const angle = Vector.angle(startX, startY, enemy.x, enemy.y);
+                    const damage = Math.floor(15 * (1 + this.player.upgrades.damage * 0.25));
+                    this.damageEnemy(enemy, damage, Math.cos(angle) * 10, Math.sin(angle) * 10, j);
+                    continue;
+                }
+                
+                const distEnd = Vector.dist(finalX, finalY, enemy.x, enemy.y);
+                if (distEnd < 220) {
+                    const angle = Vector.angle(finalX, finalY, enemy.x, enemy.y);
+                    const damage = Math.floor(35 * (1 + this.player.upgrades.damage * 0.25));
+                    this.damageEnemy(enemy, damage, Math.cos(angle) * 18, Math.sin(angle) * 18, j);
+                }
+            }
+        } else if (role === 'assassin') {
+            let dashAngle = this.player.angle; // default to mouse direction
+            let dx = 0;
+            let dy = 0;
+            if (this.keys['w'] || this.keys['arrowup']) dy -= 1;
+            if (this.keys['s'] || this.keys['arrowdown']) dy += 1;
+            if (this.keys['a'] || this.keys['arrowleft']) dx -= 1;
+            if (this.keys['d'] || this.keys['arrowright']) dx += 1;
+            if (dx !== 0 || dy !== 0) {
+                dashAngle = Math.atan2(dy, dx);
+            }
+
+            this.player.shadowDashTimer = 250; // 250ms lướt
+            this.player.shadowDashAngle = dashAngle;
+            this.player.shadowDashHitEnemies = new Set();
+
+            sounds.playSwordSlash();
+            this.triggerScreenShake(6, 150);
         }
     }
 
@@ -5501,36 +5770,36 @@ class Game {
         this.ctx.strokeRect(left, top, this.worldSize, this.worldSize);
         this.ctx.restore();
 
-        // 3.5. Vẽ Sóng Chấn Động EMP nếu đang kích hoạt
-        if (this.activeShockwave) {
+        // 3.5. Vẽ Sóng Chấn Động EMP/Skill nếu đang kích hoạt
+        this.activeShockwaves.forEach(wave => {
             this.ctx.save();
-            const screenX = this.activeShockwave.x - this.camera.x;
-            const screenY = this.activeShockwave.y - this.camera.y;
+            const screenX = wave.x - this.camera.x;
+            const screenY = wave.y - this.camera.y;
             this.ctx.translate(screenX, screenY);
             
             // Vẽ vòng tròn sóng chấn động neon lan tỏa
-            this.ctx.strokeStyle = this.activeShockwave.color;
+            this.ctx.strokeStyle = wave.color;
             // Độ mờ giảm dần khi sóng lan ra ngoài rìa
-            const opacity = 1 - (this.activeShockwave.currentRadius / this.activeShockwave.maxRadius);
+            const opacity = 1 - (wave.currentRadius / wave.maxRadius);
             const alpha = Math.max(0, opacity);
             
-            // 1. Quầng sáng sóng EMP (Outer Glow)
+            // 1. Quầng sáng sóng (Outer Glow)
             this.ctx.globalAlpha = alpha * 0.25;
-            this.ctx.strokeStyle = this.activeShockwave.color;
+            this.ctx.strokeStyle = wave.color;
             this.ctx.lineWidth = 12;
             this.ctx.beginPath();
-            this.ctx.arc(0, 0, this.activeShockwave.currentRadius, 0, Math.PI * 2);
+            this.ctx.arc(0, 0, wave.currentRadius, 0, Math.PI * 2);
             this.ctx.stroke();
 
-            // 2. Viền sóng EMP chính (Solid Core)
+            // 2. Viền sóng chính (Solid Core)
             this.ctx.globalAlpha = alpha;
             this.ctx.strokeStyle = '#ffffff';
             this.ctx.lineWidth = 3.5;
             this.ctx.beginPath();
-            this.ctx.arc(0, 0, this.activeShockwave.currentRadius, 0, Math.PI * 2);
+            this.ctx.arc(0, 0, wave.currentRadius, 0, Math.PI * 2);
             this.ctx.stroke();
             this.ctx.restore();
-        }
+        });
 
         // 3.6. Vẽ các vòng nổ của thùng thuốc nổ
         this.blastRings.forEach(br => {
