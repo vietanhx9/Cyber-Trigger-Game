@@ -527,6 +527,11 @@ class Player {
             currentSpeed *= 1.5;
         }
 
+        // Giảm 30% tốc độ di chuyển khi có động đất đang hoạt động
+        if (window.gameEngine && window.gameEngine.disasterActive && window.gameEngine.disasterType === 'earthquake') {
+            currentSpeed *= 0.7;
+        }
+
         // Di chuyển dựa trên phím nhấn
         let dx = 0;
         let dy = 0;
@@ -764,18 +769,18 @@ class Enemy {
         this.shootTimer = Math.random() * 2000; // Timer ngẫu nhiên ban đầu cho quái bắn
 
         // Xác định loại quái vật
-        const types = ['runner', 'tanker', 'shooter'];
         if (!type) {
-            // Tỷ lệ xuất hiện tùy thuộc level của game
             const r = Math.random();
             if (level < 3) {
                 this.type = 'runner';
-            } else if (level < 6) {
-                this.type = r < 0.75 ? 'runner' : 'tanker';
+            } else if (level < 5) {
+                this.type = r < 0.7 ? 'runner' : (r < 0.9 ? 'tanker' : 'shooter');
             } else {
-                if (r < 0.5) this.type = 'runner';
-                else if (r < 0.8) this.type = 'shooter';
-                else this.type = 'tanker';
+                // Từ level 5 trở đi xuất hiện Sniper
+                if (r < 0.4) this.type = 'runner';
+                else if (r < 0.65) this.type = 'shooter';
+                else if (r < 0.85) this.type = 'tanker';
+                else this.type = 'sniper';
             }
         } else {
             this.type = type;
@@ -812,6 +817,16 @@ class Enemy {
                 this.damage = 10;
                 this.xpValue = 4;
                 this.color = '#ff9f00'; // Neon Orange
+                break;
+            case 'sniper':
+                this.radius = 16;
+                this.speed = 1.5;
+                this.hp = Math.floor(45 * mult);
+                this.maxHp = this.hp;
+                this.damage = 22;
+                this.xpValue = 5;
+                this.color = '#ff00ff'; // Neon Magenta
+                this.sniperAimTimer = 0;
                 break;
             case 'runner':
             default:
@@ -862,6 +877,24 @@ class Enemy {
                 this.shootTimer = 0;
                 this.shootAtPlayer(player, gameBullets);
             }
+        } else if (this.type === 'sniper') {
+            // Sniper di chuyển giữ khoảng cách 300-450px với player
+            if (distToPlayer > 450) {
+                this.x += Math.cos(this.angle) * this.speed;
+                this.y += Math.sin(this.angle) * this.speed;
+                this.sniperAimTimer = Math.max(0, this.sniperAimTimer - deltaTime * 0.5); // Giảm nhắm khi di chuyển
+            } else if (distToPlayer < 300) {
+                this.x -= Math.cos(this.angle) * this.speed;
+                this.y -= Math.sin(this.angle) * this.speed;
+                this.sniperAimTimer = Math.max(0, this.sniperAimTimer - deltaTime * 0.5); // Giảm nhắm khi di chuyển
+            } else {
+                // Đứng yên ngắm bắn
+                this.sniperAimTimer += deltaTime;
+                if (this.sniperAimTimer >= 1200) {
+                    this.sniperAimTimer = 0;
+                    this.shootSniperBullet(player, gameBullets);
+                }
+            }
         } else {
             // Runner và Tanker: đuổi thẳng tới người chơi
             this.x += Math.cos(this.angle) * this.speed;
@@ -892,6 +925,25 @@ class Enemy {
         ));
     }
 
+    shootSniperBullet(player, gameBullets) {
+        sounds.playShoot();
+        const bulletAngle = Vector.angle(this.x, this.y, player.x, player.y);
+        const bSpeed = 16;
+        const vx = Math.cos(bulletAngle) * bSpeed;
+        const vy = Math.sin(bulletAngle) * bSpeed;
+        
+        gameBullets.push(new Bullet(
+            this.x + Math.cos(bulletAngle) * this.radius,
+            this.y + Math.sin(bulletAngle) * this.radius,
+            vx,
+            vy,
+            5,
+            this.damage,
+            '#ff00ff', // Đạn màu hồng neon
+            false // Đạn của quái vật
+        ));
+    }
+
     applyKnockback(angle, force) {
         this.knockbackX = Math.cos(angle) * force;
         this.knockbackY = Math.sin(angle) * force;
@@ -900,6 +952,22 @@ class Enemy {
     draw(ctx, camera) {
         const screenX = this.x - camera.x;
         const screenY = this.y - camera.y;
+
+        // Vẽ tia laser ngắm bắn của Sniper lên mặt đất trước
+        if (this.type === 'sniper' && this.sniperAimTimer > 0 && window.gameEngine && window.gameEngine.player) {
+            const player = window.gameEngine.player;
+            ctx.save();
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = '#ff00ff';
+            ctx.strokeStyle = `rgba(255, 0, 255, ${0.15 + (this.sniperAimTimer / 1200) * 0.65})`;
+            ctx.lineWidth = 1 + (this.sniperAimTimer / 1200) * 1.5;
+            
+            ctx.beginPath();
+            ctx.moveTo(screenX, screenY);
+            ctx.lineTo(player.x - camera.x, player.y - camera.y);
+            ctx.stroke();
+            ctx.restore();
+        }
 
         ctx.save();
         ctx.translate(screenX, screenY);
@@ -955,6 +1023,15 @@ class Enemy {
             ctx.lineTo(-r * 0.7, -r);
             ctx.lineTo(-r * 0.3, 0);
             ctx.lineTo(-r * 0.7, r);
+        } else if (this.type === 'sniper') {
+            // Sniper: Phi thuyền nhọn kép có nòng súng dài
+            const r = this.radius;
+            ctx.moveTo(r * 1.6, 0);
+            ctx.lineTo(-r * 0.4, -r * 0.4);
+            ctx.lineTo(-r * 0.8, -r * 0.9);
+            ctx.lineTo(-r * 0.3, 0);
+            ctx.lineTo(-r * 0.8, r * 0.9);
+            ctx.lineTo(-r * 0.4, r * 0.4);
         } else {
             // Runner: Hình tam giác gai góc
             const r = this.radius;
@@ -2267,6 +2344,263 @@ class FloatingText {
     }
 }
 
+// Mối nguy hiểm thiên tai (Hazards)
+class Hazard {
+    constructor(x, y, type, damage) {
+        this.x = x;
+        this.y = y;
+        this.type = type; // 'spike', 'fire', 'meteor'
+        this.damage = damage;
+        this.timer = 0;
+        this.isDead = false;
+        this.damagedEntities = new Map(); // entity -> nextDamageTime
+
+        switch (type) {
+            case 'spike':
+                this.radius = 28;
+                this.warningTime = 1000;
+                this.activeTime = 800;
+                this.color = '#39ff14'; // Xanh lá neon
+                break;
+            case 'fire':
+                this.radius = 35;
+                this.warningTime = 1200;
+                this.activeTime = 1500;
+                this.color = '#ff7700'; // Cam neon
+                break;
+            case 'meteor':
+                this.radius = 50;
+                this.warningTime = 1200;
+                this.activeTime = 0;
+                this.color = '#ff3131'; // Đỏ neon
+                this.startX = x + 300;
+                this.startY = y - 450;
+                break;
+        }
+    }
+
+    update(deltaTime, gameEngine) {
+        this.timer += deltaTime;
+        const isWarning = this.timer < this.warningTime;
+        const isActive = !isWarning && this.timer < (this.warningTime + this.activeTime);
+        
+        if (this.timer >= (this.warningTime + this.activeTime)) {
+            if (this.type === 'meteor' && !this.isDead) {
+                this.explode(gameEngine);
+            }
+            this.isDead = true;
+            return;
+        }
+
+        if (isActive) {
+            this.checkDamage(gameEngine);
+        }
+    }
+
+    checkDamage(gameEngine) {
+        const now = gameEngine.gameTime * 1000;
+        
+        // Sát thương Player
+        const distToPlayer = Vector.dist(this.x, this.y, gameEngine.player.x, gameEngine.player.y);
+        if (distToPlayer < this.radius + gameEngine.player.radius) {
+            let nextDmg = this.damagedEntities.get(gameEngine.player) || 0;
+            if (now >= nextDmg) {
+                const damaged = gameEngine.player.takeDamage(this.damage);
+                if (damaged) {
+                    gameEngine.triggerScreenShake(8, 150);
+                    gameEngine.floatingTexts.push(new FloatingText(gameEngine.player.x, gameEngine.player.y - 20, `-${this.damage}`, '#ff3131', 18));
+                    gameEngine.spawnBloodParticles(gameEngine.player.x, gameEngine.player.y, '#ff3131');
+                }
+                this.damagedEntities.set(gameEngine.player, now + 500);
+            }
+        }
+
+        // Sát thương Enemies
+        gameEngine.enemies.forEach((enemy) => {
+            if (enemy.hp > 0 && enemy.type !== 'mine') {
+                const distToEnemy = Vector.dist(this.x, this.y, enemy.x, enemy.y);
+                if (distToEnemy < this.radius + enemy.radius) {
+                    let nextDmg = this.damagedEntities.get(enemy) || 0;
+                    if (now >= nextDmg) {
+                        const enemyDmg = this.type === 'spike' ? Math.floor(this.damage * 1.5) : this.damage;
+                        enemy.hp -= enemyDmg;
+                        enemy.applyKnockback(Vector.angle(this.x, this.y, enemy.x, enemy.y), 4);
+                        gameEngine.floatingTexts.push(new FloatingText(enemy.x, enemy.y - 15, `${enemyDmg}`, this.color, 15));
+                        gameEngine.spawnBloodParticles(enemy.x, enemy.y, enemy.color, 4);
+                        this.damagedEntities.set(enemy, now + 500);
+                    }
+                }
+            }
+        });
+
+        // Xử lý quái chết
+        for (let j = gameEngine.enemies.length - 1; j >= 0; j--) {
+            const enemy = gameEngine.enemies[j];
+            if (enemy.hp <= 0) {
+                gameEngine.onEnemyKilled(enemy, j);
+            }
+        }
+    }
+
+    explode(gameEngine) {
+        sounds.playExplosion();
+        gameEngine.triggerScreenShake(12, 250);
+        gameEngine.blastRings.push(new BlastRing(this.x, this.y, this.radius, this.color));
+        
+        // Sát thương nổ lan Player
+        const distToPlayer = Vector.dist(this.x, this.y, gameEngine.player.x, gameEngine.player.y);
+        if (distToPlayer < this.radius + gameEngine.player.radius) {
+            const damaged = gameEngine.player.takeDamage(this.damage);
+            if (damaged) {
+                gameEngine.floatingTexts.push(new FloatingText(gameEngine.player.x, gameEngine.player.y - 20, `-${this.damage}`, '#ff3131', 18));
+                gameEngine.spawnBloodParticles(gameEngine.player.x, gameEngine.player.y, '#ff3131');
+            }
+        }
+
+        // Sát thương nổ lan Enemies
+        gameEngine.enemies.forEach((enemy) => {
+            if (enemy.hp > 0 && enemy.type !== 'mine') {
+                const distToEnemy = Vector.dist(this.x, this.y, enemy.x, enemy.y);
+                if (distToEnemy < this.radius + enemy.radius) {
+                    const enemyDmg = this.damage * 2;
+                    enemy.hp -= enemyDmg;
+                    enemy.applyKnockback(Vector.angle(this.x, this.y, enemy.x, enemy.y), 10);
+                    gameEngine.floatingTexts.push(new FloatingText(enemy.x, enemy.y - 15, `${enemyDmg}`, this.color, 16));
+                    gameEngine.spawnBloodParticles(enemy.x, enemy.y, enemy.color, 5);
+                }
+            }
+        });
+
+        // Xử lý quái chết
+        for (let j = gameEngine.enemies.length - 1; j >= 0; j--) {
+            const enemy = gameEngine.enemies[j];
+            if (enemy.hp <= 0) {
+                gameEngine.onEnemyKilled(enemy, j);
+            }
+        }
+
+        // Hiệu ứng hạt
+        for (let i = 0; i < 15; i++) {
+            gameEngine.particles.push(new Particle(this.x, this.y, this.color));
+        }
+    }
+
+    draw(ctx, camera) {
+        const screenX = this.x - camera.x;
+        const screenY = this.y - camera.y;
+        const isWarning = this.timer < this.warningTime;
+        const progress = this.timer / this.warningTime;
+
+        ctx.save();
+        ctx.translate(screenX, screenY);
+        
+        if (isWarning) {
+            // Vòng cảnh báo nhấp nháy phát sáng
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = this.color;
+            ctx.strokeStyle = this.color;
+            ctx.lineWidth = 2.5;
+            
+            const pulse = 1 + Math.sin(Date.now() * 0.015) * 0.08;
+            ctx.beginPath();
+            ctx.arc(0, 0, this.radius * pulse, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // Tô nền mờ cảnh báo
+            ctx.fillStyle = this.color;
+            ctx.globalAlpha = 0.15 * progress;
+            ctx.beginPath();
+            ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Vẽ thiên thạch rơi chéo từ trên không trung xuống
+            if (this.type === 'meteor') {
+                ctx.restore();
+                ctx.save();
+                const mX = this.startX + (this.x - this.startX) * progress - camera.x;
+                const mY = this.startY + (this.y - this.startY) * progress - camera.y;
+                
+                ctx.translate(mX, mY);
+                ctx.rotate(Math.atan2(this.y - this.startY, this.x - this.startX));
+                
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = this.color;
+                ctx.fillStyle = '#ffffff';
+                ctx.strokeStyle = this.color;
+                ctx.lineWidth = 2;
+                
+                ctx.beginPath();
+                ctx.arc(0, 0, 12, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+
+                // Đuôi lửa thiên thạch
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.moveTo(-10, -8);
+                ctx.lineTo(-35 - Math.random() * 15, 0);
+                ctx.lineTo(-10, 8);
+                ctx.closePath();
+                ctx.fill();
+                ctx.restore();
+                ctx.save();
+            }
+        } else {
+            // Trạng thái kích hoạt (Active)
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = this.color;
+            ctx.strokeStyle = this.color;
+            ctx.fillStyle = this.color;
+
+            if (this.type === 'spike') {
+                // Vẽ gai năng lượng sắc bén
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                const spikeCount = 6;
+                for (let i = 0; i < spikeCount; i++) {
+                    const angle = (Math.PI * 2 / spikeCount) * i;
+                    const px = Math.cos(angle) * this.radius;
+                    const py = Math.sin(angle) * this.radius;
+                    ctx.moveTo(0, 0);
+                    ctx.lineTo(px, py);
+                    
+                    const sideAngle1 = angle + Math.PI * 0.8;
+                    const sideAngle2 = angle - Math.PI * 0.8;
+                    ctx.lineTo(px + Math.cos(sideAngle1) * 8, py + Math.sin(sideAngle1) * 8);
+                    ctx.moveTo(px, py);
+                    ctx.lineTo(px + Math.cos(sideAngle2) * 8, py + Math.sin(sideAngle2) * 8);
+                }
+                ctx.stroke();
+                
+                ctx.fillStyle = '#ffffff';
+                ctx.beginPath();
+                ctx.arc(0, 0, 6, 0, Math.PI * 2);
+                ctx.fill();
+            } else if (this.type === 'fire') {
+                // Cột lửa phun trào
+                const opacity = 1 - ((this.timer - this.warningTime) / this.activeTime);
+                ctx.globalAlpha = Math.max(0, opacity);
+                
+                ctx.fillStyle = 'rgba(255, 119, 0, 0.2)';
+                ctx.beginPath();
+                ctx.arc(0, 0, this.radius * (1 + Math.random() * 0.15), 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = '#ff7700';
+                ctx.beginPath();
+                ctx.arc(0, 0, this.radius * 0.7, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = '#fffb00'; // Lõi lửa siêu nhiệt
+                ctx.beginPath();
+                ctx.arc(0, 0, this.radius * 0.35 * (1 + Math.random() * 0.1), 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+        ctx.restore();
+    }
+}
+
 // Pillar Entity (Chướng ngại vật cứng)
 class Pillar {
     constructor(x, y) {
@@ -2422,11 +2756,20 @@ class Game {
         this.hammerWaves = [];
         
         // Hệ thống điều khiển Boss định kỳ
-        this.bossSpawnInterval = 90; // Xuất hiện Boss mỗi 90 giây
-        this.nextBossTime = 90;
+        this.bossSpawnInterval = 60; // Xuất hiện Boss mỗi 60 giây
+        this.nextBossTime = 60;
         this.bossWarningActive = false;
         this.bossWarningTimer = 0;
         this.activeBoss = null;
+        
+        // Hệ thống Thiên tai địa hình định kỳ
+        this.hazards = [];
+        this.nextDisasterTime = 30; // Giây thứ 30 bắt đầu thiên tai đầu tiên
+        this.disasterInterval = 60; // Thiên tai cách nhau 60 giây
+        this.disasterActive = false;
+        this.disasterTimer = 0;
+        this.disasterType = ''; // 'earthquake', 'fire_vent', 'meteor_storm'
+        this.disasterTickTimer = 0;
         
         // Quá trình nổ chuỗi của Boss
         this.bossDeathTimer = 0;
@@ -2780,13 +3123,21 @@ class Game {
         this.activeShockwave = null;
 
         // Reset trạng thái Boss định kỳ
-        this.nextBossTime = 90;
+        this.nextBossTime = 60;
         this.bossWarningActive = false;
         this.bossWarningTimer = 0;
         this.activeBoss = null;
         this.bossDeathTimer = 0;
         this.bossDeathX = 0;
         this.bossDeathY = 0;
+
+        // Reset trạng thái Thiên tai
+        this.hazards = [];
+        this.nextDisasterTime = 30;
+        this.disasterActive = false;
+        this.disasterTimer = 0;
+        this.disasterType = '';
+        this.disasterTickTimer = 0;
 
         // Tạo chướng ngại vật Cột Năng lượng ngẫu nhiên (tránh tâm bản đồ)
         for (let i = 0; i < 20; i++) {
@@ -2963,7 +3314,89 @@ class Game {
         // Cập nhật bộ đếm thời gian
         this.gameTime += deltaTime / 1000;
 
-        // Xử lý Cảnh báo Boss & Spawn Boss định kỳ mỗi 90 giây
+        // Xử lý Thiên tai địa hình định kỳ
+        if (this.gameTime >= this.nextDisasterTime && !this.disasterActive) {
+            this.disasterActive = true;
+            this.disasterTimer = 6000; // 6 giây thiên tai
+            this.disasterTickTimer = 0;
+            
+            const types = ['earthquake', 'fire_vent', 'meteor_storm'];
+            this.disasterType = types[Math.floor(Math.random() * types.length)];
+            this.nextDisasterTime += this.disasterInterval;
+            
+            // Âm thanh báo động thiên tai
+            sounds.playLevelUp();
+            
+            const disasterNames = {
+                'earthquake': 'ĐỘNG ĐẤT / EARTHQUAKE ALERT!',
+                'fire_vent': 'LỬA PHUN TRÀO / VOLCANIC ERUPTION!',
+                'meteor_storm': 'MƯA ĐÁ CYBER / METEOR STORM!'
+            };
+            const disasterColors = {
+                'earthquake': '#39ff14',
+                'fire_vent': '#ff7700',
+                'meteor_storm': '#ff3131'
+            };
+            this.floatingTexts.push(new FloatingText(this.player.x, this.player.y - 60, disasterNames[this.disasterType], disasterColors[this.disasterType], 22));
+        }
+
+        if (this.disasterActive) {
+            this.disasterTimer -= deltaTime;
+            this.disasterTickTimer += deltaTime;
+
+            if (this.disasterType === 'earthquake') {
+                this.triggerScreenShake(3, 50);
+                if (this.disasterTickTimer >= 1000) {
+                    this.disasterTickTimer = 0;
+                    // Sinh 3 gai nhọn quanh player/quái
+                    for (let k = 0; k < 3; k++) {
+                        const angle = Math.random() * Math.PI * 2;
+                        const dist = Math.random() * 200;
+                        const hx = this.player.x + Math.cos(angle) * dist;
+                        const hy = this.player.y + Math.sin(angle) * dist;
+                        this.hazards.push(new Hazard(hx, hy, 'spike', 25));
+                    }
+                }
+            } else if (this.disasterType === 'fire_vent') {
+                if (this.disasterTickTimer >= 800) {
+                    this.disasterTickTimer = 0;
+                    // Sinh 2 cột lửa phun quanh player
+                    for (let k = 0; k < 2; k++) {
+                        const angle = Math.random() * Math.PI * 2;
+                        const dist = Math.random() * 250;
+                        const hx = this.player.x + Math.cos(angle) * dist;
+                        const hy = this.player.y + Math.sin(angle) * dist;
+                        this.hazards.push(new Hazard(hx, hy, 'fire', 15));
+                    }
+                }
+            } else if (this.disasterType === 'meteor_storm') {
+                if (this.disasterTickTimer >= 600) {
+                    this.disasterTickTimer = 0;
+                    // Sinh 2 meteor quanh player
+                    for (let k = 0; k < 2; k++) {
+                        const angle = Math.random() * Math.PI * 2;
+                        const dist = Math.random() * 350;
+                        const hx = this.player.x + Math.cos(angle) * dist;
+                        const hy = this.player.y + Math.sin(angle) * dist;
+                        this.hazards.push(new Hazard(hx, hy, 'meteor', 30));
+                    }
+                }
+            }
+
+            if (this.disasterTimer <= 0) {
+                this.disasterActive = false;
+            }
+        }
+
+        // Cập nhật các Mối nguy hiểm (Hazards)
+        for (let i = this.hazards.length - 1; i >= 0; i--) {
+            this.hazards[i].update(deltaTime, this);
+            if (this.hazards[i].isDead) {
+                this.hazards.splice(i, 1);
+            }
+        }
+
+        // Xử lý Cảnh báo Boss & Spawn Boss định kỳ mỗi 60 giây
         if (this.gameTime >= this.nextBossTime && !this.bossWarningActive) {
             this.bossWarningActive = true;
             this.bossWarningTimer = 3000; // 3 giây nhấp nháy còi báo
@@ -4656,6 +5089,15 @@ class Game {
             this.ctx.lineTo(this.canvas.width, screenY);
         }
         this.ctx.stroke();
+
+        // Vẽ các mối nguy hiểm địa hình (Hazards) dưới đất
+        if (this.hazards) {
+            this.hazards.forEach(h => {
+                if (this.isInView(h.x, h.y, h.radius + 300)) {
+                    h.draw(this.ctx, this.camera);
+                }
+            });
+        }
         // Bỏ vẽ intersection dots — tốn nhiều arc() calls mà hiệu quả thị giác thấp
 
         // 3. Vẽ tường ranh giới thế giới World bounds (Đường neon dày)
