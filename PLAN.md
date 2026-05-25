@@ -114,15 +114,46 @@ Nhặt vật phẩm `x2` (màu cyan) kích hoạt buff **8 giây** với hiệu 
 
 ---
 
-## 🏆 Trận chiến Boss (Thời điểm 2:00)
+## 🏆 Trận chiến Boss (Định kỳ mỗi 60s)
 
-1. **Ở giây 120**: Màn hình cảnh báo đỏ nhấp nháy `⚠️ SYSTEM INTRUSION ⚠️` hiện ra, đếm ngược 3 giây kèm còi báo động.
-2. **Boss xuất hiện**: Thanh HP lớn vàng neon ở đầu màn hình. Quái thường ngưng spawn.
-3. **Kỹ năng Boss**:
-   - Lao húc tốc độ cao (đổi màu đỏ hồng trước khi húc)
-   - Phun mưa đạn tỏa tròn xoay vòng
-   - Triệu hồi 4 quái Runner bao vây
-4. **Boss chết**: Nổ chuỗi 1.5 giây → Nổ lớn → Rơi **Rương Lõi Siêu Cấp** vàng.
+1. **Chu kỳ xuất hiện**: Cứ mỗi 60 giây (1:00, 2:00, 3:00...), còi báo động ré lên cùng lớp cảnh báo nhấp nháy `⚠️ SYSTEM INTRUSION ⚠️` đếm ngược 3 giây.
+2. **Quy tắc chiến đấu**: Khi Boss xuất hiện, thanh HP lớn nổi bật ở đầu màn hình. Quái vật thường tạm ngừng tự động sinh sản để người chơi tập trung tiêu diệt Boss.
+3. **5 loại Boss ngẫu nhiên siêu cyberpunk**:
+   - **CYBER INTRUDER (Vàng)**: Lao húc tốc độ cao (chuyển sang màu đỏ cảnh báo trước khi húc), bắn đạn tỏa tròn 360 độ và triệu hồi quái bao vây.
+   - **NEON VORTEX (Tím)**: Tạo từ trường lực hút mạnh kéo người chơi vào tâm, bắn đạn tím tỏa tròn di chuyển chậm và kích hoạt 3 lá chắn quay xung quanh triệt tiêu đạn của người chơi.
+   - **SYNAPSE REAPER (Hồng)**: Di chuyển cực nhanh, vung kiếm quét chém liên tục trước mặt và dịch chuyển tức thời chém xoay 360 độ quanh người chơi.
+   - **ARCH OVERSEER (Cyan)**: Quét laser đôi cyan cực rộng xoay tròn, đồng thời phóng các loạt tên lửa tầm nhiệt đỏ bám đuổi mục tiêu.
+   - **GRID INFECTION (Cam)**: Bắn loạt đạn chùm cam góc rộng, di chuyển rải mìn và tự động phân thân thành 2 bản thể nhỏ hơn khi HP giảm dưới 50%.
+4. **Phần thưởng**: Khi hạ gục Boss, nó sẽ nổ chuỗi hạt liên tục trong 1.5 giây trước khi phát nổ cực lớn, rơi ra **Rương Lõi Siêu Cấp** màu vàng chứa vũ khí tự động phụ.
+
+---
+
+## 🌪️ Hệ thống Thiên tai Địa hình (Định kỳ mỗi 60s xen kẽ)
+
+Thiên tai bùng phát định kỳ mỗi 60 giây (bắt đầu từ giây thứ 30: 0:30, 1:30, 2:30...) và kéo dài trong **6 giây**, gây ảnh hưởng trực tiếp lên cả người chơi và kẻ địch trong đấu trường:
+
+1. **🌋 Động đất (Earthquake)**
+   - Đấu trường rung chuyển dữ dội (hiệu ứng rung màn hình liên tục).
+   - Tàu bay của người chơi bị **giảm 30% tốc độ di chuyển** do địa hình nứt vỡ.
+   - Gai năng lượng xanh lá trồi lên đột ngột sau 1.0 giây cảnh báo, gây sát thương lớn.
+2. **🔥 Lửa phun trào (Thermal Eruption)**
+   - Vòng tròn cảnh báo cam nhấp nháy liên tục xuất hiện ngẫu nhiên gần người chơi.
+   - Sau 1.2 giây, cột lửa nhiệt lượng cao bùng lên trong 1.5 giây, gây **sát thương thiêu đốt liên tục** lên bất cứ ai chạm vào.
+3. **☄️ Mưa đá / Thiên thạch (Meteor Storm)**
+   - Điểm rơi thiên thạch được đánh dấu bằng các vòng cảnh báo đỏ.
+   - Thiên thạch rực lửa rơi chéo từ trên không trung xuống, va chạm mặt đất gây **vụ nổ AoE phạm vi rộng**.
+
+---
+
+## 👾 Hệ thống Kẻ địch (Enemies)
+
+Bên cạnh các Boss khổng lồ, hệ thống virus bao gồm các chủng loại quái thường:
+
+1. **🏃 Runner (Hồng)**: Di chuyển nhanh, lao thẳng áp sát để gây sát thương người chơi.
+2. **🛡️ Tanker (Tím)**: Kích thước lớn, HP cực khỏe, di chuyển chậm, sát thương va chạm cao.
+3. **🔫 Shooter (Cam)**: Di chuyển giữ cự ly cách người chơi tầm 250px và bắn đạn đỏ định kỳ.
+4. **💥 Mine (Cam nhấp nháy)**: Mìn tĩnh tự thả, khi bị bắn trúng hoặc dẫm phải sẽ nổ tung gây sát thương xung quanh.
+5. **🎯 Sniper (Hồng Magenta - Mới)**: Xuất hiện từ level 5. Giữ khoảng cách bắn rất xa (300-450px), đứng yên chiếu tia laser hồng ngắm bắn khóa mục tiêu trong 1.2s trước khi xả đạn bắn tỉa siêu tốc gây sát thương cực lớn (22 damage). Người chơi có thể né bằng cách đổi hướng đột ngột khi tia laser sáng rực rỡ nhất.
 
 ---
 
@@ -149,7 +180,9 @@ Mở Rương Boss để chọn **1 trong 3 vũ khí phụ tự động** (có th
 5. **Thử Sát thủ**: Đi gần quái (không click) → Phi thuyền tự chém; click chuột → chém chủ động.
 6. **Pause**: Nhấn `P` → Màn hình TẠM DỪNG → Nhấn `P` lại để tiếp tục, hoặc CHỌN LẠI VAI TRÒ.
 7. **Low HP**: HP < 30% → Viền đỏ neon nhấp nháy xung quanh màn hình.
-8. **Boss**: Sống đến 2:00 → Cảnh báo → Tiêu diệt Boss → Nhặt Rương → Chọn vũ khí phụ.
+8. **Thiên tai**: Sống đến giây thứ 30 → Cảnh báo Động đất/Phun lửa/Mưa đá và ảnh hưởng tương ứng lên người chơi và quái.
+9. **Boss**: Sống đến giây thứ 60 (1:00) → Màn hình cảnh báo đỏ nhấp nháy → Tiêu diệt Boss → Nhặt Rương → Chọn vũ khí phụ.
+10. **Sniper**: Đạt level 5 → Tránh đường laser hồng và né đạn bắn tỉa siêu tốc từ quái Sniper.
 
 ---
 
