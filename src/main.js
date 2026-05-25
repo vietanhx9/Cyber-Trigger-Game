@@ -203,7 +203,11 @@ class Game {
         }
 
         roleCards.forEach(card => {
+            card.addEventListener('mouseenter', () => {
+                sounds.playMenuHover();
+            });
             card.addEventListener('click', () => {
+                sounds.playMenuSelect();
                 roleCards.forEach(c => c.classList.remove('selected'));
                 card.classList.add('selected');
                 this.selectedRole = card.getAttribute('data-role');
@@ -219,26 +223,47 @@ class Game {
             });
         });
 
-        // Nút Start
-        document.getElementById('btn-start-game').addEventListener('click', () => {
-            sounds.init();
-            this.startGame();
+        // Đăng ký âm thanh hover cho toàn bộ nút bấm neon và nút loa
+        const menuButtons = document.querySelectorAll('.btn-neon, .audio-toggle-btn');
+        menuButtons.forEach(btn => {
+            btn.addEventListener('mouseenter', () => {
+                sounds.playMenuHover();
+            });
         });
+
+        // Nút Start
+        const startBtnEl = document.getElementById('btn-start-game');
+        if (startBtnEl) {
+            startBtnEl.addEventListener('click', () => {
+                sounds.init();
+                sounds.playMenuSelect();
+                this.startGame();
+            });
+        }
 
         // Nút Restart
-        document.getElementById('btn-restart-game').addEventListener('click', () => {
-            this.startGame();
-        });
+        const restartBtnEl = document.getElementById('btn-restart-game');
+        if (restartBtnEl) {
+            restartBtnEl.addEventListener('click', () => {
+                sounds.playMenuSelect();
+                this.startGame();
+            });
+        }
 
         // Nút bật/tắt loa nhanh
-        document.getElementById('btn-audio-toggle').addEventListener('click', () => {
-            sounds.toggleMute();
-        });
+        const audioBtnEl = document.getElementById('btn-audio-toggle');
+        if (audioBtnEl) {
+            audioBtnEl.addEventListener('click', () => {
+                sounds.toggleMute();
+                sounds.playMenuSelect();
+            });
+        }
 
         // Nút Resume trong Pause Menu
         const resumeBtn = document.getElementById('btn-resume-game');
         if (resumeBtn) {
             resumeBtn.addEventListener('click', () => {
+                sounds.playMenuSelect();
                 if (this.state === 'PAUSED') {
                     this.state = 'PLAYING';
                     sounds.startMusic();
@@ -257,6 +282,7 @@ class Game {
         const backToMenuBtn = document.getElementById('btn-back-to-menu');
         if (backToMenuBtn) {
             backToMenuBtn.addEventListener('click', () => {
+                sounds.playMenuSelect();
                 this.backToMainMenu();
             });
         }
@@ -2823,6 +2849,43 @@ class Game {
         this.currentUpgradesPool = shuffled.slice(0, 3);
     }
 
+    apply3DTilt(card, glowColor = 'rgba(0, 240, 255, 0.25)') {
+        card.addEventListener('mouseenter', () => {
+            sounds.playMenuHover();
+        });
+
+        card.addEventListener('mousemove', (e) => {
+            const rect = card.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            const centerX = rect.width / 2;
+            const centerY = rect.height / 2;
+            
+            const tiltX = ((y - centerY) / centerY) * -15; 
+            const tiltY = ((x - centerX) / centerX) * 15;
+            
+            card.style.transform = `perspective(1000px) rotateX(${tiltX}deg) rotateY(${tiltY}deg) scale(1.04)`;
+            card.style.transition = 'transform 0.05s ease';
+            
+            const glow = card.querySelector('[class^="card-glow-"]');
+            if (glow) {
+                const glowX = (x / rect.width) * 100;
+                const glowY = (y / rect.height) * 100;
+                glow.style.background = `radial-gradient(circle at ${glowX}% ${glowY}%, ${glowColor} 0%, transparent 65%)`;
+            }
+        });
+        
+        card.addEventListener('mouseleave', () => {
+            card.style.transform = 'perspective(1000px) rotateX(0deg) rotateY(0deg) scale(1)';
+            card.style.transition = 'transform 0.3s ease';
+            const glow = card.querySelector('[class^="card-glow-"]');
+            if (glow) {
+                glow.style.background = '';
+            }
+        });
+    }
+
     displayUpgradeMenu() {
         const choicesGrid = document.getElementById('upgrade-choices');
         if (!choicesGrid) return;
@@ -2838,7 +2901,18 @@ class Game {
                 <p>${upgrade.desc}</p>
                 <span class="card-stat">${upgrade.stat}</span>
             `;
+            
+            // Xác định màu phát sáng
+            let glowColor = 'rgba(0, 240, 255, 0.25)';
+            if (upgrade.class.includes('green')) glowColor = 'rgba(57, 255, 20, 0.25)';
+            else if (upgrade.class.includes('pink')) glowColor = 'rgba(255, 0, 127, 0.25)';
+            else if (upgrade.class.includes('purple')) glowColor = 'rgba(176, 38, 255, 0.25)';
+            else if (upgrade.class.includes('yellow')) glowColor = 'rgba(255, 251, 0, 0.25)';
+            
+            this.apply3DTilt(card, glowColor);
+
             card.addEventListener('click', () => {
+                sounds.playMenuSelect();
                 this.applyUpgrade(upgrade.id);
             });
             choicesGrid.appendChild(card);
@@ -2968,7 +3042,10 @@ class Game {
                 <span class="card-stat">${upgrade.stat}</span>
             `;
             
+            this.apply3DTilt(card, 'rgba(255, 251, 0, 0.25)');
+            
             card.addEventListener('click', () => {
+                sounds.playMenuSelect();
                 this.applySuperUpgrade(upgrade.id);
             });
 

@@ -394,9 +394,11 @@ canvas {
 }
 
 .xp-bar-fill {
+    position: relative;
+    overflow: hidden;
     height: 100%;
-    background: linear-gradient(90deg, var(--neon-purple), var(--neon-blue));
-    box-shadow: 0 0 10px var(--neon-blue);
+    background: repeating-linear-gradient(45deg, rgba(255,255,255,0.12) 0px, rgba(255,255,255,0.12) 2px, transparent 2px, transparent 8px), linear-gradient(90deg, var(--neon-purple), var(--neon-blue));
+    box-shadow: 0 0 12px var(--neon-blue);
     width: 0%;
     transition: width 0.15s ease-out;
 }
@@ -473,9 +475,11 @@ canvas {
 }
 
 .health-bar-fill {
+    position: relative;
+    overflow: hidden;
     height: 100%;
-    background: linear-gradient(90deg, #ff5e62, var(--neon-red));
-    box-shadow: 0 0 10px var(--neon-red);
+    background: repeating-linear-gradient(45deg, rgba(255,255,255,0.12) 0px, rgba(255,255,255,0.12) 2px, transparent 2px, transparent 8px), linear-gradient(90deg, #ff5e62, var(--neon-red));
+    box-shadow: 0 0 12px var(--neon-red);
     width: 100%;
     transition: width 0.15s ease-out;
 }
@@ -1062,9 +1066,11 @@ canvas {
 }
 
 .boss-hp-bar-fill {
+    position: relative;
+    overflow: hidden;
     height: 100%;
-    background: linear-gradient(90deg, #ff9f00, var(--neon-yellow));
-    box-shadow: 0 0 10px var(--neon-yellow);
+    background: repeating-linear-gradient(45deg, rgba(255,255,255,0.12) 0px, rgba(255,255,255,0.12) 2px, transparent 2px, transparent 8px), linear-gradient(90deg, #ff9f00, var(--neon-yellow));
+    box-shadow: 0 0 12px var(--neon-yellow);
     width: 100%;
     transition: width 0.1s ease-out;
 }
@@ -1364,5 +1370,30 @@ canvas {
     100% {
         transform: translate(0, 0) skew(0deg);
         filter: hue-rotate(0deg) contrast(1);
+    }
+}
+
+/* Pseudo-elements for scanline glowing sweep on progress bars */
+.health-bar-fill::after, .xp-bar-fill::after, .boss-hp-bar-fill::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -150%;
+    width: 60px;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.45), transparent);
+    transform: skewX(-30deg);
+    animation: bar-light-sweep 2.8s infinite ease-in-out;
+}
+
+@keyframes bar-light-sweep {
+    0% {
+        left: -150%;
+    }
+    45% {
+        left: 150%;
+    }
+    100% {
+        left: 150%;
     }
 }
