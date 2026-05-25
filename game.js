@@ -603,9 +603,21 @@ class Player {
             ctx.save();
             ctx.translate(sX, sY);
             ctx.rotate(gt.angle);
+            
+            // 1. Quầng sáng bóng mờ (Outer Glow)
+            ctx.globalAlpha = gt.alpha * 0.25;
+            ctx.strokeStyle = this.color;
+            ctx.lineWidth = 6;
+            ctx.beginPath();
+            ctx.moveTo(this.radius, 0);
+            ctx.lineTo(-this.radius, -this.radius * 0.8);
+            ctx.lineTo(-this.radius * 0.5, 0);
+            ctx.lineTo(-this.radius, this.radius * 0.8);
+            ctx.closePath();
+            ctx.stroke();
+
+            // 2. Viền bóng mờ chính (Solid Core)
             ctx.globalAlpha = gt.alpha;
-            ctx.shadowBlur = 8;
-            ctx.shadowColor = this.color;
             ctx.strokeStyle = this.color;
             ctx.lineWidth = 2;
             ctx.beginPath();
@@ -615,6 +627,7 @@ class Player {
             ctx.lineTo(-this.radius, this.radius * 0.8);
             ctx.closePath();
             ctx.stroke();
+            
             ctx.restore();
         });
 
@@ -625,11 +638,21 @@ class Player {
         ctx.translate(screenX, screenY);
         ctx.rotate(this.angle);
 
-        // Hiệu ứng phát sáng neon cho nhân vật
-        ctx.shadowBlur = 15;
-        ctx.shadowColor = this.color;
+        // Hiệu ứng phát sáng neon cho nhân vật (Double-stroke outer glow)
+        // 1. Quầng sáng phi thuyền (Outer Glow)
+        ctx.globalAlpha = 0.25;
+        ctx.strokeStyle = this.color;
+        ctx.lineWidth = 8;
+        ctx.beginPath();
+        ctx.moveTo(this.radius, 0);
+        ctx.lineTo(-this.radius, -this.radius * 0.8);
+        ctx.lineTo(-this.radius * 0.5, 0);
+        ctx.lineTo(-this.radius, this.radius * 0.8);
+        ctx.closePath();
+        ctx.stroke();
 
-        // Vẽ thân phi thuyền hình tam giác sắc sảo
+        // 2. Thân phi thuyền chính (Solid Core)
+        ctx.globalAlpha = 1.0;
         ctx.fillStyle = 'rgba(10, 15, 30, 0.9)';
         ctx.strokeStyle = this.color;
         ctx.lineWidth = 3;
@@ -643,9 +666,17 @@ class Player {
         ctx.fill();
         ctx.stroke();
 
-        // Động cơ phản lực neon (vẽ lửa nhỏ phía sau)
+        // Động cơ phản lực neon (vẽ lửa nhỏ phía sau - Double draw)
+        // 1. Quầng sáng đuôi (Outer Glow)
+        ctx.globalAlpha = 0.25;
+        ctx.fillStyle = '#ff007f';
+        ctx.beginPath();
+        ctx.arc(-this.radius, 0, 10 + Math.random() * 5, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 2. Lửa chính (Solid Core)
+        ctx.globalAlpha = 1.0;
         ctx.fillStyle = '#ff007f'; // Lửa hồng neon
-        ctx.shadowColor = '#ff007f';
         ctx.beginPath();
         ctx.moveTo(-this.radius * 0.6, -this.radius * 0.3);
         ctx.lineTo(-this.radius - 10 - Math.random() * 8, 0);
@@ -657,10 +688,19 @@ class Player {
         const role = this.role || 'fighter';
         if (role === 'assassin') {
             // Sát thủ: Kiếm năng lượng hồng neon
+            // 1. Quầng sáng kiếm (Outer Glow)
+            ctx.globalAlpha = 0.25;
             ctx.strokeStyle = '#ff007f';
-            ctx.lineWidth = 3;
-            ctx.shadowColor = '#ff007f';
-            ctx.shadowBlur = 10;
+            ctx.lineWidth = 8;
+            ctx.beginPath();
+            ctx.moveTo(0, -this.radius * 0.4);
+            ctx.lineTo(this.radius * 1.6, -this.radius * 0.8);
+            ctx.stroke();
+
+            // 2. Kiếm chính (Solid Core)
+            ctx.globalAlpha = 1.0;
+            ctx.strokeStyle = '#ffffff'; // lõi trắng siêu sáng
+            ctx.lineWidth = 3.0;
             ctx.beginPath();
             ctx.moveTo(0, -this.radius * 0.4);
             ctx.lineTo(this.radius * 1.6, -this.radius * 0.8); // Kiếm vươn dài nhọn
@@ -673,11 +713,24 @@ class Player {
             ctx.fill();
         } else if (role === 'fighter') {
             // Đấu sĩ: Búa vàng tạ khủng
+            // 1. Quầng sáng búa (Outer Glow)
+            ctx.globalAlpha = 0.25;
             ctx.strokeStyle = '#fffb00';
-            ctx.fillStyle = '#fffb00';
-            ctx.shadowColor = '#fffb00';
-            ctx.shadowBlur = 10;
-            ctx.lineWidth = 4;
+            ctx.lineWidth = 8;
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(this.radius * 1.1, 0);
+            ctx.stroke();
+            
+            ctx.beginPath();
+            ctx.rect(this.radius * 1.1, -12, 7, 24);
+            ctx.stroke();
+
+            // 2. Búa chính (Solid Core)
+            ctx.globalAlpha = 1.0;
+            ctx.strokeStyle = '#fffb00';
+            ctx.fillStyle = '#ffffff';
+            ctx.lineWidth = 3.5;
             
             // Cán búa
             ctx.beginPath();
@@ -686,16 +739,24 @@ class Player {
             ctx.stroke();
             
             // Đầu búa
+            ctx.fillStyle = '#fffb00';
             ctx.beginPath();
             ctx.rect(this.radius * 1.1, -12, 7, 24);
             ctx.fill();
             ctx.stroke();
         } else if (role === 'mage') {
             // Pháp sư: Cầu ma pháp tím phát sáng
+            // 1. Quầng sáng cầu phép (Outer Glow)
+            ctx.globalAlpha = 0.25;
+            ctx.fillStyle = '#b026ff';
+            ctx.beginPath();
+            ctx.arc(this.radius * 0.4, 0, 14, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 2. Cầu chính (Solid Core)
+            ctx.globalAlpha = 1.0;
             ctx.fillStyle = '#ffffff';
             ctx.strokeStyle = '#b026ff';
-            ctx.shadowColor = '#b026ff';
-            ctx.shadowBlur = 12;
             ctx.lineWidth = 2.5;
             ctx.beginPath();
             ctx.arc(this.radius * 0.4, 0, 7, 0, Math.PI * 2);
@@ -703,10 +764,21 @@ class Player {
             ctx.stroke();
         } else if (role === 'ranger') {
             // Xạ thủ: Nòng súng kép dài màu cyan
+            // 1. Quầng sáng nòng súng (Outer Glow)
+            ctx.globalAlpha = 0.25;
             ctx.strokeStyle = '#00f0ff';
-            ctx.shadowColor = '#00f0ff';
-            ctx.shadowBlur = 10;
-            ctx.lineWidth = 3;
+            ctx.lineWidth = 7;
+            ctx.beginPath();
+            ctx.moveTo(-this.radius * 0.2, -this.radius * 0.4);
+            ctx.lineTo(this.radius * 1.4, -this.radius * 0.4);
+            ctx.moveTo(-this.radius * 0.2, this.radius * 0.4);
+            ctx.lineTo(this.radius * 1.4, this.radius * 0.4);
+            ctx.stroke();
+
+            // 2. Nòng súng chính (Solid Core)
+            ctx.globalAlpha = 1.0;
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 2.5;
             
             // Nòng 1
             ctx.beginPath();
@@ -727,12 +799,21 @@ class Player {
         if (this.powerups.shield > 0) {
             ctx.save();
             ctx.translate(screenX, screenY);
+            
+            // 1. Quầng sáng khiên (Outer Glow)
+            ctx.globalAlpha = 0.25;
+            ctx.strokeStyle = '#fffb00';
+            ctx.lineWidth = 6;
             ctx.beginPath();
             ctx.arc(0, 0, this.radius * 1.7, 0, Math.PI * 2);
-            ctx.strokeStyle = '#fffb00'; // Vàng neon
+            ctx.stroke();
+
+            // 2. Viền khiên chính (Solid Core)
+            ctx.globalAlpha = 1.0;
+            ctx.strokeStyle = '#ffffff';
             ctx.lineWidth = 2;
-            ctx.shadowBlur = 12;
-            ctx.shadowColor = '#fffb00';
+            ctx.beginPath();
+            ctx.arc(0, 0, this.radius * 1.7, 0, Math.PI * 2);
             ctx.stroke();
             
             // Vẽ các vân khiên xoay tròn nhẹ
@@ -953,47 +1034,51 @@ class Enemy {
         const screenX = this.x - camera.x;
         const screenY = this.y - camera.y;
 
-        // Vẽ tia laser ngắm bắn của Sniper lên mặt đất trước
+        // Vẽ tia laser ngắm bắn của Sniper lên mặt đất trước (Khử shadowBlur)
         if (this.type === 'sniper' && this.sniperAimTimer > 0 && window.gameEngine && window.gameEngine.player) {
             const player = window.gameEngine.player;
             ctx.save();
-            ctx.shadowBlur = 10;
-            ctx.shadowColor = '#ff00ff';
-            ctx.strokeStyle = `rgba(255, 0, 255, ${0.15 + (this.sniperAimTimer / 1200) * 0.65})`;
-            ctx.lineWidth = 1 + (this.sniperAimTimer / 1200) * 1.5;
             
+            // 1. Quầng sáng laser (Outer Glow)
+            ctx.globalAlpha = 0.2;
+            ctx.strokeStyle = '#ff00ff';
+            ctx.lineWidth = 4 + (this.sniperAimTimer / 1200) * 3.0;
             ctx.beginPath();
             ctx.moveTo(screenX, screenY);
             ctx.lineTo(player.x - camera.x, player.y - camera.y);
             ctx.stroke();
+
+            // 2. Tia laser chính (Solid Core)
+            ctx.globalAlpha = 0.85;
+            ctx.strokeStyle = `rgba(255, 0, 255, ${0.45 + (this.sniperAimTimer / 1200) * 0.55})`;
+            ctx.lineWidth = 1 + (this.sniperAimTimer / 1200) * 1.5;
+            ctx.beginPath();
+            ctx.moveTo(screenX, screenY);
+            ctx.lineTo(player.x - camera.x, player.y - camera.y);
+            ctx.stroke();
+            
             ctx.restore();
         }
 
         ctx.save();
         ctx.translate(screenX, screenY);
-        ctx.rotate(this.angle);
-
-        ctx.shadowBlur = 10;
-        ctx.shadowColor = this.color;
-        ctx.strokeStyle = this.color;
-        ctx.lineWidth = 2.5;
-
-        // Vẽ các khối đa giác quái vật góc cạnh cyberpunk
-        ctx.fillStyle = 'rgba(15, 10, 20, 0.8)';
-        ctx.beginPath();
 
         if (this.type === 'mine') {
-            ctx.restore();
-            ctx.save();
-            ctx.translate(screenX, screenY);
-            ctx.shadowBlur = 10;
-            ctx.shadowColor = this.color;
+            const flash = Math.floor(Date.now() / 150) % 2 === 0;
+            const coreColor = flash ? 'rgba(255, 159, 0, 0.45)' : 'rgba(20, 10, 0, 0.9)';
+
+            // 1. Quầng sáng (Outer Glow)
+            ctx.globalAlpha = 0.25;
+            ctx.fillStyle = this.color;
+            ctx.beginPath();
+            ctx.arc(0, 0, this.radius * 2.0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 2. Lõi chính (Solid Core)
+            ctx.globalAlpha = 1.0;
             ctx.strokeStyle = this.color;
             ctx.lineWidth = 2.5;
-            
-            const flash = Math.floor(Date.now() / 150) % 2 === 0;
-            ctx.fillStyle = flash ? 'rgba(255, 159, 0, 0.45)' : 'rgba(20, 10, 0, 0.9)';
-            
+            ctx.fillStyle = coreColor;
             ctx.beginPath();
             ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
             ctx.fill();
@@ -1007,8 +1092,11 @@ class Enemy {
             return;
         }
 
+        ctx.rotate(this.angle);
+
+        // Định dạng đa giác cho từng loại quái
+        ctx.beginPath();
         if (this.type === 'tanker') {
-            // Hình lục giác gồ ghề
             const r = this.radius;
             ctx.moveTo(r, 0);
             ctx.lineTo(r * 0.5, -r * 0.85);
@@ -1017,14 +1105,12 @@ class Enemy {
             ctx.lineTo(-r * 0.5, r * 0.85);
             ctx.lineTo(r * 0.5, r * 0.85);
         } else if (this.type === 'shooter') {
-            // Hình thoi / Tứ giác nhọn phóng đạn
             const r = this.radius;
             ctx.moveTo(r * 1.3, 0);
             ctx.lineTo(-r * 0.7, -r);
             ctx.lineTo(-r * 0.3, 0);
             ctx.lineTo(-r * 0.7, r);
         } else if (this.type === 'sniper') {
-            // Sniper: Phi thuyền nhọn kép có nòng súng dài
             const r = this.radius;
             ctx.moveTo(r * 1.6, 0);
             ctx.lineTo(-r * 0.4, -r * 0.4);
@@ -1033,15 +1119,25 @@ class Enemy {
             ctx.lineTo(-r * 0.8, r * 0.9);
             ctx.lineTo(-r * 0.4, r * 0.4);
         } else {
-            // Runner: Hình tam giác gai góc
             const r = this.radius;
             ctx.moveTo(r * 1.2, 0);
             ctx.lineTo(-r * 0.8, -r * 0.8);
             ctx.lineTo(-r * 0.4, 0);
             ctx.lineTo(-r * 0.8, r * 0.8);
         }
-        
         ctx.closePath();
+
+        // 1. Quầng sáng viền (Outer Glow Stroke)
+        ctx.globalAlpha = 0.25;
+        ctx.strokeStyle = this.color;
+        ctx.lineWidth = 7.0;
+        ctx.stroke();
+
+        // 2. Thân quái chính (Solid Core)
+        ctx.globalAlpha = 1.0;
+        ctx.fillStyle = 'rgba(15, 10, 20, 0.8)';
+        ctx.strokeStyle = this.color;
+        ctx.lineWidth = 2.5;
         ctx.fill();
         ctx.stroke();
 
@@ -1058,7 +1154,7 @@ class Enemy {
             ctx.fillStyle = 'rgba(0,0,0,0.5)';
             ctx.fillRect(-barW/2, 0, barW, barH);
             
-            // Thanh máu còn lại (Xanh lá cây hoặc Đỏ dựa theo phần trăm)
+            // Thanh máu còn lại
             const hpPct = this.hp / this.maxHp;
             ctx.fillStyle = hpPct > 0.4 ? '#39ff14' : '#ff3131';
             ctx.fillRect(-barW/2, 0, barW * hpPct, barH);
@@ -1611,15 +1707,34 @@ class Boss extends Enemy {
         ctx.translate(screenX, screenY);
         ctx.rotate(this.angle + (this.bossState === 'BURST' ? Date.now() * 0.005 : 0));
 
-        ctx.shadowBlur = 20;
-        ctx.shadowColor = this.color;
+        // Thiết lập viền vẽ
         ctx.strokeStyle = this.color;
         ctx.lineWidth = 4;
 
         if (this.bossType === 'yellow_intruder') {
-            ctx.fillStyle = 'rgba(20, 15, 5, 0.95)';
+            // 1. Quầng sáng (Outer Glow)
+            ctx.globalAlpha = 0.25;
+            ctx.strokeStyle = this.color;
+            ctx.lineWidth = 10;
             ctx.beginPath();
             const spikeCount = 10;
+            for (let i = 0; i < spikeCount * 2; i++) {
+                const angle = (Math.PI / spikeCount) * i;
+                const dist = i % 2 === 0 ? this.radius : this.radius * 0.6;
+                const px = Math.cos(angle) * dist;
+                const py = Math.sin(angle) * dist;
+                if (i === 0) ctx.moveTo(px, py);
+                else ctx.lineTo(px, py);
+            }
+            ctx.closePath();
+            ctx.stroke();
+
+            // 2. Thân chính (Solid Core)
+            ctx.globalAlpha = 1.0;
+            ctx.fillStyle = 'rgba(20, 15, 5, 0.95)';
+            ctx.strokeStyle = this.color;
+            ctx.lineWidth = 4;
+            ctx.beginPath();
             for (let i = 0; i < spikeCount * 2; i++) {
                 const angle = (Math.PI / spikeCount) * i;
                 const dist = i % 2 === 0 ? this.radius : this.radius * 0.6;
@@ -1632,18 +1747,48 @@ class Boss extends Enemy {
             ctx.fill();
             ctx.stroke();
             
-            // Inner core
+            // Inner core (Double draw)
+            ctx.globalAlpha = 0.35;
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(0, 0, this.radius * 0.45, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.globalAlpha = 1.0;
             ctx.fillStyle = this.color;
-            ctx.shadowBlur = 10;
-            ctx.shadowColor = '#ffffff';
             ctx.beginPath();
             ctx.arc(0, 0, this.radius * 0.3, 0, Math.PI * 2);
             ctx.fill();
         } 
         else if (this.bossType === 'neon_vortex') {
-            ctx.beginPath();
             const armCount = 6;
             const angleOffset = Date.now() * 0.003;
+
+            // 1. Quầng sáng (Outer Glow)
+            ctx.globalAlpha = 0.25;
+            ctx.strokeStyle = this.color;
+            ctx.lineWidth = 10;
+            ctx.beginPath();
+            for (let i = 0; i < armCount; i++) {
+                const baseAngle = (Math.PI * 2 / armCount) * i + angleOffset;
+                ctx.moveTo(0, 0);
+                const cpX = Math.cos(baseAngle + 0.5) * this.radius * 0.7;
+                const cpY = Math.sin(baseAngle + 0.5) * this.radius * 0.7;
+                const destX = Math.cos(baseAngle + 1.0) * this.radius;
+                const destY = Math.sin(baseAngle + 1.0) * this.radius;
+                ctx.quadraticCurveTo(cpX, cpY, destX, destY);
+            }
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.arc(0, 0, this.radius * 0.65, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // 2. Thân chính (Solid Core)
+            ctx.globalAlpha = 1.0;
+            ctx.strokeStyle = this.color;
+            ctx.lineWidth = 4;
+            ctx.beginPath();
             for (let i = 0; i < armCount; i++) {
                 const baseAngle = (Math.PI * 2 / armCount) * i + angleOffset;
                 ctx.moveTo(0, 0);
@@ -1661,16 +1806,21 @@ class Boss extends Enemy {
             ctx.fill();
             ctx.stroke();
             
+            // Lõi phát sáng
             ctx.fillStyle = this.color;
             ctx.beginPath();
             ctx.arc(0, 0, this.radius * 0.3 * (1 + Math.sin(Date.now() * 0.01) * 0.1), 0, Math.PI * 2);
             ctx.fill();
         } 
         else if (this.bossType === 'synapse_reaper') {
-            ctx.fillStyle = 'rgba(20, 5, 15, 0.95)';
-            ctx.beginPath();
             const bladeCount = 4;
             const baseRot = Date.now() * 0.004;
+
+            // 1. Quầng sáng (Outer Glow)
+            ctx.globalAlpha = 0.25;
+            ctx.strokeStyle = this.color;
+            ctx.lineWidth = 10;
+            ctx.beginPath();
             for (let i = 0; i < bladeCount; i++) {
                 const angle = (Math.PI * 2 / bladeCount) * i + baseRot;
                 const tipX = Math.cos(angle) * this.radius * 1.3;
@@ -1679,7 +1829,27 @@ class Boss extends Enemy {
                 const leftY = Math.sin(angle - 0.4) * this.radius * 0.5;
                 const rightX = Math.cos(angle + 0.4) * this.radius * 0.5;
                 const rightY = Math.sin(angle + 0.4) * this.radius * 0.5;
-                
+                if (i === 0) ctx.moveTo(leftX, leftY);
+                ctx.lineTo(tipX, tipY);
+                ctx.lineTo(rightX, rightY);
+            }
+            ctx.closePath();
+            ctx.stroke();
+
+            // 2. Thân chính (Solid Core)
+            ctx.globalAlpha = 1.0;
+            ctx.fillStyle = 'rgba(20, 5, 15, 0.95)';
+            ctx.strokeStyle = this.color;
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            for (let i = 0; i < bladeCount; i++) {
+                const angle = (Math.PI * 2 / bladeCount) * i + baseRot;
+                const tipX = Math.cos(angle) * this.radius * 1.3;
+                const tipY = Math.sin(angle) * this.radius * 1.3;
+                const leftX = Math.cos(angle - 0.4) * this.radius * 0.5;
+                const leftY = Math.sin(angle - 0.4) * this.radius * 0.5;
+                const rightX = Math.cos(angle + 0.4) * this.radius * 0.5;
+                const rightY = Math.sin(angle + 0.4) * this.radius * 0.5;
                 if (i === 0) ctx.moveTo(leftX, leftY);
                 ctx.lineTo(tipX, tipY);
                 ctx.lineTo(rightX, rightY);
@@ -1694,10 +1864,30 @@ class Boss extends Enemy {
             ctx.fill();
         } 
         else if (this.bossType === 'arch_overseer') {
-            ctx.fillStyle = 'rgba(5, 15, 20, 0.95)';
-            ctx.beginPath();
             const sideCount = 8;
             const rot = Date.now() * 0.001;
+
+            // 1. Quầng sáng (Outer Glow)
+            ctx.globalAlpha = 0.25;
+            ctx.strokeStyle = this.color;
+            ctx.lineWidth = 10;
+            ctx.beginPath();
+            for (let i = 0; i < sideCount; i++) {
+                const angle = (Math.PI * 2 / sideCount) * i + rot;
+                const px = Math.cos(angle) * this.radius;
+                const py = Math.sin(angle) * this.radius;
+                if (i === 0) ctx.moveTo(px, py);
+                else ctx.lineTo(px, py);
+            }
+            ctx.closePath();
+            ctx.stroke();
+
+            // 2. Thân chính (Solid Core)
+            ctx.globalAlpha = 1.0;
+            ctx.fillStyle = 'rgba(5, 15, 20, 0.95)';
+            ctx.strokeStyle = this.color;
+            ctx.lineWidth = 4;
+            ctx.beginPath();
             for (let i = 0; i < sideCount; i++) {
                 const angle = (Math.PI * 2 / sideCount) * i + rot;
                 const px = Math.cos(angle) * this.radius;
@@ -1728,6 +1918,24 @@ class Boss extends Enemy {
             const nodeCount = 5;
             const tRot = Date.now() * 0.002;
             
+            // 1. Quầng sáng (Outer Glow)
+            ctx.globalAlpha = 0.25;
+            ctx.strokeStyle = this.color;
+            ctx.lineWidth = 9;
+            ctx.beginPath();
+            for (let i = 0; i < nodeCount; i++) {
+                const angle = (Math.PI * 2 / nodeCount) * i + tRot;
+                ctx.moveTo(0, 0);
+                ctx.lineTo(Math.cos(angle) * this.radius * 1.1, Math.sin(angle) * this.radius * 1.1);
+            }
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.arc(0, 0, this.radius * 0.7, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // 2. Thân chính (Solid Core)
+            ctx.globalAlpha = 1.0;
             ctx.strokeStyle = this.color;
             ctx.lineWidth = 3;
             ctx.beginPath();
@@ -1781,12 +1989,24 @@ class Boss extends Enemy {
                     ctx.save();
                     ctx.translate(sx - camera.x, sy - camera.y);
                     ctx.rotate(Date.now() * 0.01 + i);
-                    ctx.shadowBlur = 10;
-                    ctx.shadowColor = '#b026ff';
+                    
+                    // 1. Quầng sáng (Outer Glow)
+                    ctx.globalAlpha = 0.25;
+                    ctx.strokeStyle = '#b026ff';
+                    ctx.lineWidth = 6;
+                    ctx.beginPath();
+                    ctx.moveTo(15, 0);
+                    ctx.lineTo(0, -7);
+                    ctx.lineTo(-15, 0);
+                    ctx.lineTo(0, 7);
+                    ctx.closePath();
+                    ctx.stroke();
+
+                    // 2. Viền chính (Solid Core)
+                    ctx.globalAlpha = 1.0;
                     ctx.strokeStyle = '#b026ff';
                     ctx.fillStyle = 'rgba(15, 10, 25, 0.85)';
                     ctx.lineWidth = 2;
-                    
                     ctx.beginPath();
                     ctx.moveTo(15, 0);
                     ctx.lineTo(0, -7);
@@ -1804,21 +2024,33 @@ class Boss extends Enemy {
         if (this.bossType === 'arch_overseer' && this.bossState === 'LASER_BEAM') {
             ctx.save();
             ctx.translate(screenX, screenY);
-            ctx.shadowBlur = 15;
-            ctx.shadowColor = '#00f0ff';
-            ctx.strokeStyle = 'rgba(0, 240, 255, 0.35)';
+            
+            // 1. Quầng sáng laser cực dày (Outer Glow)
+            ctx.globalAlpha = 0.25;
+            ctx.strokeStyle = '#00f0ff';
+            ctx.lineWidth = 24;
+            
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(Math.cos(this.laserAngle) * 800, Math.sin(this.laserAngle) * 800);
+            ctx.moveTo(0, 0);
+            ctx.lineTo(Math.cos(this.laserAngle + Math.PI) * 800, Math.sin(this.laserAngle + Math.PI) * 800);
+            ctx.stroke();
+            
+            // 2. Laser chính (Solid Core)
+            ctx.globalAlpha = 0.6;
+            ctx.strokeStyle = '#00f0ff';
             ctx.lineWidth = 14;
             
             ctx.beginPath();
             ctx.moveTo(0, 0);
             ctx.lineTo(Math.cos(this.laserAngle) * 800, Math.sin(this.laserAngle) * 800);
-            ctx.stroke();
-            
-            ctx.beginPath();
             ctx.moveTo(0, 0);
             ctx.lineTo(Math.cos(this.laserAngle + Math.PI) * 800, Math.sin(this.laserAngle + Math.PI) * 800);
             ctx.stroke();
             
+            // 3. Lõi trắng laser (White inner core)
+            ctx.globalAlpha = 1.0;
             ctx.strokeStyle = '#ffffff';
             ctx.lineWidth = 3.5;
             ctx.beginPath();
@@ -1890,14 +2122,19 @@ class Bullet {
             ctx.stroke();
         }
 
-        // Vẽ viên đạn chính phát sáng neon
+        // Vẽ viên đạn chính với quầng phát sáng (Double-stroke / Double-fill outer glow)
+        // 1. Quầng sáng (Outer Glow)
+        ctx.globalAlpha = 0.35;
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
+        ctx.arc(screenX, screenY, this.radius * 2.5, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 2. Lõi đạn chính (Solid Core)
         ctx.globalAlpha = 1.0;
-        ctx.shadowBlur = 10;
-        ctx.shadowColor = this.color;
-        ctx.fillStyle = '#ffffff'; // Lõi đạn màu trắng cho sáng hẳn
+        ctx.fillStyle = '#ffffff'; // Lõi đạn màu trắng
         ctx.strokeStyle = this.color;
         ctx.lineWidth = 1.5;
-
         ctx.beginPath();
         ctx.arc(screenX, screenY, this.radius, 0, Math.PI * 2);
         ctx.fill();
@@ -1932,15 +2169,22 @@ class SwordSlash {
         ctx.translate(sX, sY);
         ctx.rotate(this.angle);
 
-        ctx.globalAlpha = Math.max(0, this.life / this.lifeMax);
-        ctx.shadowBlur = 20;
-        ctx.shadowColor = this.color;
+        const alpha = Math.max(0, this.life / this.lifeMax);
+        
+        // 1. Quầng sáng chém (Outer Glow)
+        ctx.globalAlpha = alpha * 0.25;
         ctx.strokeStyle = this.color;
-        ctx.lineWidth = 6;
+        ctx.lineWidth = 14;
         ctx.lineCap = 'round';
-
         ctx.beginPath();
-        // Cung quét góc chém 120 độ (-60 đến +60 độ)
+        ctx.arc(0, 0, this.radius, -Math.PI / 3, Math.PI / 3);
+        ctx.stroke();
+
+        // 2. Kiếm sáng chính (Solid Core)
+        ctx.globalAlpha = alpha;
+        ctx.strokeStyle = '#ffffff'; // lõi trắng sáng rực
+        ctx.lineWidth = 4;
+        ctx.beginPath();
         ctx.arc(0, 0, this.radius, -Math.PI / 3, Math.PI / 3);
         ctx.stroke();
 
@@ -1977,19 +2221,29 @@ class HammerWave {
         ctx.translate(sX, sY);
         ctx.rotate(this.angle);
 
-        ctx.globalAlpha = Math.max(0, this.life / this.lifeMax);
-        ctx.shadowBlur = 15;
-        ctx.shadowColor = this.color;
+        const alpha = Math.max(0, this.life / this.lifeMax);
+        
+        // 1. Quầng sáng chấn động (Outer Glow)
+        ctx.globalAlpha = alpha * 0.25;
         ctx.strokeStyle = this.color;
-        ctx.lineWidth = 5;
+        ctx.lineWidth = 12;
         ctx.lineCap = 'round';
-
         ctx.beginPath();
         if (this.is360) {
-            // Vẽ toàn bộ vòng tròn 360 độ
             ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
         } else {
-            // Sóng xung kích hình nón lan tỏa góc 90 độ (-45 đến +45 độ)
+            ctx.arc(0, 0, this.radius, -Math.PI / 4, Math.PI / 4);
+        }
+        ctx.stroke();
+
+        // 2. Sóng chính (Solid Core)
+        ctx.globalAlpha = alpha;
+        ctx.strokeStyle = '#ffffff'; // lõi trắng
+        ctx.lineWidth = 3.5;
+        ctx.beginPath();
+        if (this.is360) {
+            ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+        } else {
             ctx.arc(0, 0, this.radius, -Math.PI / 4, Math.PI / 4);
         }
         ctx.stroke();
@@ -2100,9 +2354,15 @@ class HomingMissile {
         ctx.translate(screenX, screenY);
         ctx.rotate(this.angle);
 
+        // 1. Quầng sáng (Outer Glow)
+        ctx.globalAlpha = 0.35;
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
+        ctx.arc(0, 0, this.radius * 2.5, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 2. Thân chính (Solid core)
         ctx.globalAlpha = 1.0;
-        ctx.shadowBlur = 12;
-        ctx.shadowColor = this.color;
         ctx.fillStyle = '#ffffff';
         ctx.strokeStyle = this.color;
         ctx.lineWidth = 1.5;
@@ -2117,7 +2377,14 @@ class HomingMissile {
         ctx.fill();
         ctx.stroke();
 
-        // Đuôi lửa phản lực vàng
+        // Đuôi lửa phản lực vàng (Double draw)
+        ctx.globalAlpha = 0.25;
+        ctx.fillStyle = '#fffb00';
+        ctx.beginPath();
+        ctx.arc(-this.radius * 0.8, 0, 8, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.globalAlpha = 1.0;
         ctx.fillStyle = '#fffb00';
         ctx.beginPath();
         ctx.moveTo(-this.radius * 0.8, -this.radius * 0.3);
@@ -2198,8 +2465,16 @@ class Item {
         ctx.save();
         ctx.translate(screenX, screenY);
         
-        ctx.shadowBlur = 8;
-        ctx.shadowColor = this.color;
+        // Vẽ quầng sáng neon (Double-stroke / Double-fill outer glow)
+        // 1. Quầng sáng (Outer Glow)
+        ctx.globalAlpha = 0.3;
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
+        ctx.arc(0, 0, this.radius * 2.5, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 2. Vật phẩm chính (Solid core)
+        ctx.globalAlpha = 1.0;
         ctx.fillStyle = this.color;
         ctx.strokeStyle = '#ffffff';
         ctx.lineWidth = 1;
@@ -2222,8 +2497,14 @@ class Item {
             ctx.fill();
             ctx.stroke();
         } else if (this.type === 'chest') {
-            // Vẽ rương nâng cấp siêu cấp phát sáng neon vàng
-            ctx.shadowBlur = 18;
+            // Vẽ rương nâng cấp siêu cấp phát sáng neon vàng (Double glow)
+            ctx.globalAlpha = 0.25;
+            ctx.fillStyle = '#fffb00';
+            ctx.beginPath();
+            ctx.arc(0, 0, this.radius * 2.2, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.globalAlpha = 1.0;
             ctx.fillStyle = 'rgba(255, 251, 0, 0.25)';
             ctx.strokeStyle = '#fffb00';
             ctx.lineWidth = 2.5;
@@ -2495,13 +2776,21 @@ class Hazard {
         ctx.translate(screenX, screenY);
         
         if (isWarning) {
-            // Vòng cảnh báo nhấp nháy phát sáng
-            ctx.shadowBlur = 10;
-            ctx.shadowColor = this.color;
-            ctx.strokeStyle = this.color;
-            ctx.lineWidth = 2.5;
-            
+            // Vòng cảnh báo nhấp nháy phát sáng (Double-stroke)
             const pulse = 1 + Math.sin(Date.now() * 0.015) * 0.08;
+            
+            // 1. Quầng sáng (Outer Glow)
+            ctx.globalAlpha = 0.25;
+            ctx.strokeStyle = this.color;
+            ctx.lineWidth = 6;
+            ctx.beginPath();
+            ctx.arc(0, 0, this.radius * pulse, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // 2. Viền chính (Solid Core)
+            ctx.globalAlpha = 0.85;
+            ctx.strokeStyle = this.color;
+            ctx.lineWidth = 2.0;
             ctx.beginPath();
             ctx.arc(0, 0, this.radius * pulse, 0, Math.PI * 2);
             ctx.stroke();
@@ -2513,7 +2802,7 @@ class Hazard {
             ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
             ctx.fill();
 
-            // Vẽ thiên thạch rơi chéo từ trên không trung xuống
+            // Vẽ thiên thạch rơi chéo từ trên không trung xuống (Double-draw)
             if (this.type === 'meteor') {
                 ctx.restore();
                 ctx.save();
@@ -2523,12 +2812,18 @@ class Hazard {
                 ctx.translate(mX, mY);
                 ctx.rotate(Math.atan2(this.y - this.startY, this.x - this.startX));
                 
-                ctx.shadowBlur = 15;
-                ctx.shadowColor = this.color;
+                // 1. Quầng sáng thiên thạch (Outer Glow)
+                ctx.globalAlpha = 0.35;
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(0, 0, 24, 0, Math.PI * 2);
+                ctx.fill();
+
+                // 2. Lõi thiên thạch (Solid Core)
+                ctx.globalAlpha = 1.0;
                 ctx.fillStyle = '#ffffff';
                 ctx.strokeStyle = this.color;
                 ctx.lineWidth = 2;
-                
                 ctx.beginPath();
                 ctx.arc(0, 0, 12, 0, Math.PI * 2);
                 ctx.fill();
@@ -2547,16 +2842,34 @@ class Hazard {
             }
         } else {
             // Trạng thái kích hoạt (Active)
-            ctx.shadowBlur = 15;
-            ctx.shadowColor = this.color;
-            ctx.strokeStyle = this.color;
-            ctx.fillStyle = this.color;
-
             if (this.type === 'spike') {
-                // Vẽ gai năng lượng sắc bén
-                ctx.lineWidth = 3;
+                // Vẽ gai năng lượng sắc bén (Double-stroke)
+                // 1. Quầng sáng (Outer Glow)
+                ctx.globalAlpha = 0.25;
+                ctx.strokeStyle = this.color;
+                ctx.lineWidth = 8;
                 ctx.beginPath();
                 const spikeCount = 6;
+                for (let i = 0; i < spikeCount; i++) {
+                    const angle = (Math.PI * 2 / spikeCount) * i;
+                    const px = Math.cos(angle) * this.radius;
+                    const py = Math.sin(angle) * this.radius;
+                    ctx.moveTo(0, 0);
+                    ctx.lineTo(px, py);
+                    
+                    const sideAngle1 = angle + Math.PI * 0.8;
+                    const sideAngle2 = angle - Math.PI * 0.8;
+                    ctx.lineTo(px + Math.cos(sideAngle1) * 8, py + Math.sin(sideAngle1) * 8);
+                    ctx.moveTo(px, py);
+                    ctx.lineTo(px + Math.cos(sideAngle2) * 8, py + Math.sin(sideAngle2) * 8);
+                }
+                ctx.stroke();
+
+                // 2. Viền chính (Solid Core)
+                ctx.globalAlpha = 1.0;
+                ctx.strokeStyle = this.color;
+                ctx.lineWidth = 3;
+                ctx.beginPath();
                 for (let i = 0; i < spikeCount; i++) {
                     const angle = (Math.PI * 2 / spikeCount) * i;
                     const px = Math.cos(angle) * this.radius;
@@ -2581,17 +2894,20 @@ class Hazard {
                 const opacity = 1 - ((this.timer - this.warningTime) / this.activeTime);
                 ctx.globalAlpha = Math.max(0, opacity);
                 
-                ctx.fillStyle = 'rgba(255, 119, 0, 0.2)';
+                // 1. Quầng sáng cột lửa (Outer Glow)
+                ctx.fillStyle = 'rgba(255, 119, 0, 0.25)';
                 ctx.beginPath();
-                ctx.arc(0, 0, this.radius * (1 + Math.random() * 0.15), 0, Math.PI * 2);
+                ctx.arc(0, 0, this.radius * 1.5, 0, Math.PI * 2);
                 ctx.fill();
 
+                // 2. Thân lửa (Fire Body)
                 ctx.fillStyle = '#ff7700';
                 ctx.beginPath();
                 ctx.arc(0, 0, this.radius * 0.7, 0, Math.PI * 2);
                 ctx.fill();
 
-                ctx.fillStyle = '#fffb00'; // Lõi lửa siêu nhiệt
+                // 3. Lõi siêu nhiệt (Hot core)
+                ctx.fillStyle = '#fffb00';
                 ctx.beginPath();
                 ctx.arc(0, 0, this.radius * 0.35 * (1 + Math.random() * 0.1), 0, Math.PI * 2);
                 ctx.fill();
@@ -2618,13 +2934,26 @@ class Pillar {
         ctx.save();
         ctx.translate(screenX, screenY);
         
-        ctx.shadowBlur = 12;
-        ctx.shadowColor = this.neonColor;
+        // 1. Quầng sáng cột bát giác (Outer Glow)
+        ctx.globalAlpha = 0.25;
+        ctx.strokeStyle = this.neonColor;
+        ctx.lineWidth = 8;
+        ctx.beginPath();
+        for (let i = 0; i < 8; i++) {
+            const angle = (Math.PI / 4) * i;
+            const px = Math.cos(angle) * this.radius;
+            const py = Math.sin(angle) * this.radius;
+            if (i === 0) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+        ctx.stroke();
+
+        // 2. Thân cột chính (Solid Core)
+        ctx.globalAlpha = 1.0;
         ctx.fillStyle = 'rgba(15, 23, 42, 0.9)'; // Dark center
         ctx.strokeStyle = this.neonColor;
         ctx.lineWidth = 3;
-
-        // Vẽ cột bát giác
         ctx.beginPath();
         for (let i = 0; i < 8; i++) {
             const angle = (Math.PI / 4) * i;
@@ -2670,8 +2999,15 @@ class Barrel {
         ctx.save();
         ctx.translate(screenX, screenY);
 
-        ctx.shadowBlur = 10;
-        ctx.shadowColor = this.color;
+        // 1. Quầng sáng thùng (Outer Glow)
+        ctx.globalAlpha = 0.25;
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
+        ctx.arc(0, 0, this.radius * 2.0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 2. Thùng chính (Solid Core)
+        ctx.globalAlpha = 1.0;
         ctx.fillStyle = 'rgba(20, 10, 10, 0.9)';
         ctx.strokeStyle = this.color;
         ctx.lineWidth = 2.5;
@@ -2720,15 +3056,25 @@ class BlastRing {
 
         ctx.save();
         ctx.translate(screenX, screenY);
-        ctx.globalAlpha = Math.max(0, this.alpha);
-        ctx.strokeStyle = this.color;
-        ctx.lineWidth = 5;
-        ctx.shadowBlur = 20;
-        ctx.shadowColor = this.color;
         
+        const alpha = Math.max(0, this.alpha);
+        
+        // 1. Quầng sáng vụ nổ (Outer Glow)
+        ctx.globalAlpha = alpha * 0.25;
+        ctx.strokeStyle = this.color;
+        ctx.lineWidth = 12;
         ctx.beginPath();
         ctx.arc(0, 0, this.currentRadius, 0, Math.PI * 2);
         ctx.stroke();
+
+        // 2. Vòng nổ chính (Solid Core)
+        ctx.globalAlpha = alpha;
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 3.5;
+        ctx.beginPath();
+        ctx.arc(0, 0, this.currentRadius, 0, Math.PI * 2);
+        ctx.stroke();
+
         ctx.restore();
     }
 }
@@ -2863,12 +3209,20 @@ class Game {
                     sounds.stopMusic();
                     const pauseMenu = document.getElementById('pause-menu');
                     if (pauseMenu) pauseMenu.classList.remove('hidden');
+                    if (this.bossWarningActive) {
+                        const warningOverlay = document.getElementById('boss-warning-overlay');
+                        if (warningOverlay) warningOverlay.classList.add('hidden');
+                    }
                 } else if (this.state === 'PAUSED') {
                     this.state = 'PLAYING';
                     sounds.startMusic();
                     const pauseMenu = document.getElementById('pause-menu');
                     if (pauseMenu) pauseMenu.classList.add('hidden');
                     this.lastTime = performance.now();
+                    if (this.bossWarningActive) {
+                        const warningOverlay = document.getElementById('boss-warning-overlay');
+                        if (warningOverlay) warningOverlay.classList.remove('hidden');
+                    }
                 }
             }
         });
@@ -2951,6 +3305,10 @@ class Game {
                     const pauseMenu = document.getElementById('pause-menu');
                     if (pauseMenu) pauseMenu.classList.add('hidden');
                     this.lastTime = performance.now();
+                    if (this.bossWarningActive) {
+                        const warningOverlay = document.getElementById('boss-warning-overlay');
+                        if (warningOverlay) warningOverlay.classList.remove('hidden');
+                    }
                 }
             });
         }
@@ -4651,6 +5009,12 @@ class Game {
         this.state = 'UPGRADE';
         sounds.playLevelUp();
         
+        // Tạm ẩn cảnh báo Boss nếu đang kích hoạt để tránh che menu nâng cấp
+        if (this.bossWarningActive) {
+            const warningOverlay = document.getElementById('boss-warning-overlay');
+            if (warningOverlay) warningOverlay.classList.add('hidden');
+        }
+        
         // Lấy danh sách nâng cấp ngẫu nhiên để chuẩn bị hiển thị thẻ bài
         this.generateUpgradeChoices();
         this.displayUpgradeMenu();
@@ -4895,6 +5259,12 @@ class Game {
         document.getElementById('upgrade-menu').classList.add('hidden');
         this.state = 'PLAYING';
         this.lastTime = performance.now();
+        
+        // Hiện lại cảnh báo Boss nếu đang đếm ngược
+        if (this.bossWarningActive) {
+            const warningOverlay = document.getElementById('boss-warning-overlay');
+            if (warningOverlay) warningOverlay.classList.remove('hidden');
+        }
     }
 
     // --- SUPER CHEST UPGRADE LOGIC ---
@@ -4903,6 +5273,13 @@ class Game {
     triggerSuperUpgrade() {
         this.state = 'SUPER_UPGRADE';
         sounds.playLevelUp();
+        
+        // Tạm ẩn cảnh báo Boss nếu đang kích hoạt để tránh che menu nâng cấp
+        if (this.bossWarningActive) {
+            const warningOverlay = document.getElementById('boss-warning-overlay');
+            if (warningOverlay) warningOverlay.classList.add('hidden');
+        }
+        
         this.generateSuperUpgradeChoices();
         this.displaySuperUpgradeMenu();
     }
@@ -4982,6 +5359,12 @@ class Game {
         document.getElementById('super-upgrade-menu').classList.add('hidden');
         this.state = 'PLAYING';
         this.lastTime = performance.now();
+
+        // Hiện lại cảnh báo Boss nếu đang đếm ngược
+        if (this.bossWarningActive) {
+            const warningOverlay = document.getElementById('boss-warning-overlay');
+            if (warningOverlay) warningOverlay.classList.remove('hidden');
+        }
     }
 
     // --- UPDATE HUD UI ---
@@ -5107,12 +5490,14 @@ class Game {
         const bottom = this.worldSize - this.camera.y;
 
         this.ctx.save();
-        this.ctx.strokeStyle = 'rgba(176, 38, 255, 0.3)'; // Brighter Neon Purple boundary tint
-        this.ctx.lineWidth = 8;
-        this.ctx.shadowBlur = 20;
-        this.ctx.shadowColor = '#b026ff';
-        
-        // Vẽ viền chữ nhật toàn thế giới
+        // 1. Quầng sáng ranh giới (Outer Glow)
+        this.ctx.strokeStyle = 'rgba(176, 38, 255, 0.2)';
+        this.ctx.lineWidth = 16;
+        this.ctx.strokeRect(left, top, this.worldSize, this.worldSize);
+
+        // 2. Viền ranh giới chính (Solid Core)
+        this.ctx.strokeStyle = '#b026ff';
+        this.ctx.lineWidth = 4;
         this.ctx.strokeRect(left, top, this.worldSize, this.worldSize);
         this.ctx.restore();
 
@@ -5127,11 +5512,20 @@ class Game {
             this.ctx.strokeStyle = this.activeShockwave.color;
             // Độ mờ giảm dần khi sóng lan ra ngoài rìa
             const opacity = 1 - (this.activeShockwave.currentRadius / this.activeShockwave.maxRadius);
-            this.ctx.globalAlpha = Math.max(0, opacity);
-            this.ctx.lineWidth = 4;
-            this.ctx.shadowBlur = 25;
-            this.ctx.shadowColor = this.activeShockwave.color;
+            const alpha = Math.max(0, opacity);
+            
+            // 1. Quầng sáng sóng EMP (Outer Glow)
+            this.ctx.globalAlpha = alpha * 0.25;
+            this.ctx.strokeStyle = this.activeShockwave.color;
+            this.ctx.lineWidth = 12;
+            this.ctx.beginPath();
+            this.ctx.arc(0, 0, this.activeShockwave.currentRadius, 0, Math.PI * 2);
+            this.ctx.stroke();
 
+            // 2. Viền sóng EMP chính (Solid Core)
+            this.ctx.globalAlpha = alpha;
+            this.ctx.strokeStyle = '#ffffff';
+            this.ctx.lineWidth = 3.5;
             this.ctx.beginPath();
             this.ctx.arc(0, 0, this.activeShockwave.currentRadius, 0, Math.PI * 2);
             this.ctx.stroke();
@@ -5221,13 +5615,23 @@ class Game {
                     // Lưỡi dao tự xoay tròn tại chỗ cực ngầu
                     this.ctx.rotate(Date.now() * 0.012 + i);
                     
-                    this.ctx.shadowBlur = 12;
-                    this.ctx.shadowColor = '#b026ff';
+                    // 1. Quầng sáng khiên xoay (Outer Glow)
+                    this.ctx.globalAlpha = 0.25;
+                    this.ctx.strokeStyle = '#b026ff';
+                    this.ctx.lineWidth = 6;
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(12, 0);
+                    this.ctx.lineTo(0, -6);
+                    this.ctx.lineTo(-12, 0);
+                    this.ctx.lineTo(0, 6);
+                    this.ctx.closePath();
+                    this.ctx.stroke();
+
+                    // 2. Thân chính khiên xoay (Solid Core)
+                    this.ctx.globalAlpha = 1.0;
                     this.ctx.fillStyle = 'rgba(15, 10, 25, 0.85)';
                     this.ctx.strokeStyle = '#b026ff';
                     this.ctx.lineWidth = 2;
-                    
-                    // Vẽ hình thoi dẹt sắc bén làm lưỡi dao ánh sáng
                     this.ctx.beginPath();
                     this.ctx.moveTo(12, 0);
                     this.ctx.lineTo(0, -6);
@@ -5259,13 +5663,27 @@ class Game {
                 // Drone xoay bồng bềnh nhẹ nhàng
                 this.ctx.rotate(Math.sin(Date.now() * 0.003) * 0.2);
                 
-                this.ctx.shadowBlur = 10;
-                this.ctx.shadowColor = '#39ff14';
+                // 1. Quầng sáng Laser Drone (Outer Glow)
+                this.ctx.globalAlpha = 0.25;
+                this.ctx.strokeStyle = '#39ff14';
+                this.ctx.lineWidth = 6;
+                this.ctx.beginPath();
+                for (let i = 0; i < 6; i++) {
+                    const angle = (Math.PI / 3) * i;
+                    const px = Math.cos(angle) * 8;
+                    const py = Math.sin(angle) * 8;
+                    if (i === 0) this.ctx.moveTo(px, py);
+                    else this.ctx.lineTo(px, py);
+                }
+                this.ctx.closePath();
+                this.ctx.stroke();
+
+                // 2. Thân chính Drone (Solid Core)
+                this.ctx.globalAlpha = 1.0;
                 this.ctx.fillStyle = 'rgba(10, 20, 10, 0.9)';
                 this.ctx.strokeStyle = '#39ff14';
                 this.ctx.lineWidth = 2;
                 
-                // Vẽ thân Drone hình lục giác nhỏ
                 this.ctx.beginPath();
                 for (let i = 0; i < 6; i++) {
                     const angle = (Math.PI / 3) * i;
