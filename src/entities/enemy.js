@@ -14,6 +14,11 @@ export class Enemy {
         this.knockbackY = 0;
         this.shootTimer = Math.random() * 2000; // Timer ngẫu nhiên ban đầu cho quái bắn
         this.stunTimer = 0; // Bộ đếm thời gian choáng (stun) từ kỹ năng Đấu sĩ
+        
+        // Trạng thái độc tố (Synergy Digital Venom)
+        this.poisonDuration = 0;
+        this.poisonDamage = 0;
+        this.lastPoisonTickTime = 0;
 
         // Xác định loại quái vật
         if (!type) {
@@ -75,6 +80,16 @@ export class Enemy {
                 this.color = '#ff00ff'; // Neon Magenta
                 this.sniperAimTimer = 0;
                 break;
+            case 'portal':
+                this.radius = 35;
+                this.speed = 0;
+                this.hp = Math.floor(180 * mult); // HP cao
+                this.maxHp = this.hp;
+                this.damage = 0; // Không gây sát thương va chạm
+                this.xpValue = 18; // Điểm kinh nghiệm cao
+                this.color = '#ff00ff'; // Hồng/tím neon
+                this.portalSpawnTimer = 0;
+                break;
             case 'runner':
             default:
                 this.radius = 14;
@@ -88,17 +103,52 @@ export class Enemy {
         }
     }
 
-    update(player, gameBullets, deltaTime) {
-        // Giảm lực đẩy lùi (Knockback) theo thời gian
+    update(player, gameBullets, deltaTime, gameEngineRef) {
+        // Giảm lực đẩy lùi (Knockback) theo thời gian (giảm chậm hơn trong Zero Gravity)
+        const isZeroGravity = window.gameEngine && window.gameEngine.disasterActive && window.gameEngine.disasterType === 'zero_gravity';
+        const decay = isZeroGravity ? 0.95 : 0.8;
         this.x += this.knockbackX;
         this.y += this.knockbackY;
-        this.knockbackX *= 0.8;
-        this.knockbackY *= 0.8;
+        this.knockbackX *= decay;
+        this.knockbackY *= decay;
+
+        // Xử lý rút máu độc tố (Synergy Digital Venom)
+        if (this.poisonDuration > 0) {
+            this.poisonDuration -= deltaTime;
+            this.lastPoisonTickTime += deltaTime;
+            if (this.lastPoisonTickTime >= 500) {
+                this.lastPoisonTickTime = 0;
+                this.hp -= this.poisonDamage;
+                if (gameEngineRef) {
+                    gameEngineRef.floatingTexts.push(new FloatingText(this.x, this.y - this.radius - 5, `${this.poisonDamage}`, '#39ff14', 13));
+                    gameEngineRef.spawnBloodParticles(this.x, this.y, '#39ff14', 2);
+                }
+            }
+        }
 
         if (this.stunTimer > 0) {
             this.stunTimer -= deltaTime;
             if (this.stunTimer < 0) this.stunTimer = 0;
             // Vẫn giới hạn trong bản đồ thế giới đề phòng bị đẩy lùi vượt biên
+            this.x = Math.max(this.radius, Math.min(3000 - this.radius, this.x));
+            this.y = Math.max(this.radius, Math.min(3000 - this.radius, this.y));
+            return;
+        }
+
+        if (this.type === 'portal') {
+            this.portalSpawnTimer = (this.portalSpawnTimer || 0) + deltaTime;
+            if (this.portalSpawnTimer >= 2500) {
+                this.portalSpawnTimer = 0;
+                if (gameEngineRef) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const sx = this.x + Math.cos(angle) * (this.radius + 15);
+                    const sy = this.y + Math.sin(angle) * (this.radius + 15);
+                    const spawnType = Math.random() < 0.75 ? 'runner' : 'shooter';
+                    const spawnEnemy = new Enemy(sx, sy, gameEngineRef.player.level, spawnType);
+                    gameEngineRef.enemies.push(spawnEnemy);
+                    gameEngineRef.spawnBloodParticles(sx, sy, spawnEnemy.color, 4);
+                }
+            }
             this.x = Math.max(this.radius, Math.min(3000 - this.radius, this.x));
             this.y = Math.max(this.radius, Math.min(3000 - this.radius, this.y));
             return;
@@ -111,41 +161,45 @@ export class Enemy {
         this.angle = Vector.angle(this.x, this.y, player.x, player.y);
         const distToPlayer = Vector.dist(this.x, this.y, player.x, player.y);
 
+        const isFrequencyGlitch = window.gameEngine && window.gameEngine.disasterActive && window.gameEngine.disasterType === 'frequency_glitch';
+        const currentSpeed = isFrequencyGlitch ? this.speed * 2.0 : this.speed;
+
         // Logic di chuyển cho từng loại quái vật
         if (this.type === 'shooter') {
             // Giữ khoảng cách tầm 250px với người chơi
             if (distToPlayer > 280) {
-                this.x += Math.cos(this.angle) * this.speed;
-                this.y += Math.sin(this.angle) * this.speed;
+                this.x += Math.cos(this.angle) * currentSpeed;
+                this.y += Math.sin(this.angle) * currentSpeed;
             } else if (distToPlayer < 200) {
-                this.x -= Math.cos(this.angle) * this.speed;
-                this.y -= Math.sin(this.angle) * this.speed;
+                this.x -= Math.cos(this.angle) * currentSpeed;
+                this.y -= Math.sin(this.angle) * currentSpeed;
             } else {
                 // Đi vòng quanh nhẹ nhàng
                 const tangentAngle = this.angle + Math.PI / 2;
-                this.x += Math.cos(tangentAngle) * (this.speed * 0.5);
-                this.y += Math.sin(tangentAngle) * (this.speed * 0.5);
+                this.x += Math.cos(tangentAngle) * (currentSpeed * 0.5);
+                this.y += Math.sin(tangentAngle) * (currentSpeed * 0.5);
             }
 
             // Tự bắn đạn vào người chơi mỗi 2 giây
+            const shootInterval = isFrequencyGlitch ? 1000 : 2000;
             this.shootTimer += deltaTime;
-            if (this.shootTimer >= 2000) {
+            if (this.shootTimer >= shootInterval) {
                 this.shootTimer = 0;
                 this.shootAtPlayer(player, gameBullets);
             }
         } else if (this.type === 'sniper') {
             // Sniper di chuyển giữ khoảng cách 300-450px với player
             if (distToPlayer > 450) {
-                this.x += Math.cos(this.angle) * this.speed;
-                this.y += Math.sin(this.angle) * this.speed;
-                this.sniperAimTimer = Math.max(0, this.sniperAimTimer - deltaTime * 0.5); // Giảm nhắm khi di chuyển
+                this.x += Math.cos(this.angle) * currentSpeed;
+                this.y += Math.sin(this.angle) * currentSpeed;
+                this.sniperAimTimer = Math.max(0, this.sniperAimTimer - (isFrequencyGlitch ? deltaTime : deltaTime * 0.5)); // Giảm nhắm khi di chuyển
             } else if (distToPlayer < 300) {
-                this.x -= Math.cos(this.angle) * this.speed;
-                this.y -= Math.sin(this.angle) * this.speed;
-                this.sniperAimTimer = Math.max(0, this.sniperAimTimer - deltaTime * 0.5); // Giảm nhắm khi di chuyển
+                this.x -= Math.cos(this.angle) * currentSpeed;
+                this.y -= Math.sin(this.angle) * currentSpeed;
+                this.sniperAimTimer = Math.max(0, this.sniperAimTimer - (isFrequencyGlitch ? deltaTime : deltaTime * 0.5)); // Giảm nhắm khi di chuyển
             } else {
                 // Đứng yên ngắm bắn
-                this.sniperAimTimer += deltaTime;
+                this.sniperAimTimer += isFrequencyGlitch ? deltaTime * 2 : deltaTime;
                 if (this.sniperAimTimer >= 1200) {
                     this.sniperAimTimer = 0;
                     this.shootSniperBullet(player, gameBullets);
@@ -153,8 +207,8 @@ export class Enemy {
             }
         } else {
             // Runner và Tanker: đuổi thẳng tới người chơi
-            this.x += Math.cos(this.angle) * this.speed;
-            this.y += Math.sin(this.angle) * this.speed;
+            this.x += Math.cos(this.angle) * currentSpeed;
+            this.y += Math.sin(this.angle) * currentSpeed;
         }
 
         // Giới hạn trong bản đồ thế giới
@@ -201,13 +255,75 @@ export class Enemy {
     }
 
     applyKnockback(angle, force) {
-        this.knockbackX = Math.cos(angle) * force;
-        this.knockbackY = Math.sin(angle) * force;
+        const isZeroGravity = window.gameEngine && window.gameEngine.disasterActive && window.gameEngine.disasterType === 'zero_gravity';
+        const mult = isZeroGravity ? 3 : 1;
+        this.knockbackX = Math.cos(angle) * force * mult;
+        this.knockbackY = Math.sin(angle) * force * mult;
     }
 
     draw(ctx, camera) {
         const screenX = this.x - camera.x;
         const screenY = this.y - camera.y;
+
+        // Vẽ cổng dịch chuyển (Portal) và trả về sớm
+        if (this.type === 'portal') {
+            ctx.save();
+            ctx.translate(screenX, screenY);
+            
+            // 1. Quầng sáng rực rỡ cổng dịch chuyển (Outer Glow)
+            ctx.globalAlpha = 0.22;
+            ctx.strokeStyle = '#ff00ff';
+            ctx.lineWidth = 14;
+            ctx.beginPath();
+            ctx.arc(0, 0, this.radius * 1.35, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // 2. Viền ngoài cổng dịch chuyển
+            ctx.globalAlpha = 0.85;
+            ctx.strokeStyle = '#b026ff';
+            ctx.lineWidth = 3.5;
+            ctx.beginPath();
+            ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // 3. Xoắn ốc năng lượng tự quay tròn
+            ctx.rotate(Date.now() * 0.0035);
+            ctx.strokeStyle = '#ff007f';
+            ctx.lineWidth = 2.5;
+            ctx.beginPath();
+            for (let i = 0; i < 360; i += 6) {
+                const rVal = (i / 360) * this.radius;
+                const rad = (i * Math.PI) / 180;
+                const px = Math.cos(rad) * rVal;
+                const py = Math.sin(rad) * rVal;
+                if (i === 0) ctx.moveTo(px, py);
+                else ctx.lineTo(px, py);
+            }
+            ctx.stroke();
+            
+            // Lõi trắng sáng nhấp nháy phát điện
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(0, 0, 7 + Math.sin(Date.now() * 0.012) * 2.5, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.restore();
+
+            // Vẽ thanh máu mini phía trên portal nếu mất máu
+            if (this.hp < this.maxHp) {
+                ctx.save();
+                ctx.translate(screenX, screenY - this.radius - 12);
+                const barW = this.radius * 2;
+                const barH = 4;
+                ctx.fillStyle = 'rgba(0,0,0,0.5)';
+                ctx.fillRect(-barW/2, 0, barW, barH);
+                const hpPct = this.hp / this.maxHp;
+                ctx.fillStyle = hpPct > 0.4 ? '#39ff14' : '#ff3131';
+                ctx.fillRect(-barW/2, 0, barW * hpPct, barH);
+                ctx.restore();
+            }
+            return;
+        }
 
         // Vẽ tia laser ngắm bắn của Sniper lên mặt đất trước (Khử shadowBlur)
         if (this.type === 'sniper' && this.sniperAimTimer > 0 && window.gameEngine && window.gameEngine.player) {
@@ -237,6 +353,25 @@ export class Enemy {
 
         ctx.save();
         ctx.translate(screenX, screenY);
+
+        // Vẽ hiệu ứng vòng độc phát sáng (Synergy Digital Venom)
+        if (this.poisonDuration > 0) {
+            ctx.save();
+            ctx.strokeStyle = '#39ff14';
+            ctx.lineWidth = 2.5;
+            ctx.globalAlpha = 0.45 + Math.sin(Date.now() * 0.015) * 0.25;
+            ctx.beginPath();
+            ctx.arc(0, 0, this.radius + 6, 0, Math.PI * 2);
+            ctx.stroke();
+            
+            // Vẽ hạt độc phát sáng nhỏ bay xung quanh
+            ctx.fillStyle = '#39ff14';
+            const orbitAngle = (Date.now() * 0.005);
+            ctx.beginPath();
+            ctx.arc(Math.cos(orbitAngle) * (this.radius + 6), Math.sin(orbitAngle) * (this.radius + 6), 3, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        }
 
         if (this.type === 'mine') {
             const flash = Math.floor(Date.now() / 150) % 2 === 0;
@@ -408,6 +543,17 @@ export class Boss extends Enemy {
     }
 
     update(player, gameBullets, deltaTime, gameEngineRef) {
+        const isFrequencyGlitch = gameEngineRef && gameEngineRef.disasterActive && gameEngineRef.disasterType === 'frequency_glitch';
+        const activeDelta = isFrequencyGlitch ? deltaTime * 2 : deltaTime;
+        
+        // Tăng tốc độ di chuyển tạm thời của Boss trong Frequency Glitch
+        const originalSpeed = this.speed;
+        const originalChargeSpeed = this.chargeSpeed;
+        if (isFrequencyGlitch) {
+            this.speed *= 2.0;
+            if (this.chargeSpeed) this.chargeSpeed *= 2.0;
+        }
+
         // Giảm lực đẩy lùi (Boss bị đẩy lùi rất ít)
         this.x += this.knockbackX;
         this.y += this.knockbackY;
@@ -415,8 +561,8 @@ export class Boss extends Enemy {
         this.knockbackY *= 0.6;
 
         this.angle = Vector.angle(this.x, this.y, player.x, player.y);
-        this.bossTimer += deltaTime;
-        this.stateTimer += deltaTime;
+        this.bossTimer += activeDelta;
+        this.stateTimer += activeDelta;
 
         // Cập nhật hồi chiêu chém khiên cho vortex
         if (this.shieldHitTimer && this.shieldHitTimer > 0) {
@@ -795,6 +941,10 @@ export class Boss extends Enemy {
         // Giới hạn trong bản đồ thế giới
         this.x = Math.max(this.radius, Math.min(3000 - this.radius, this.x));
         this.y = Math.max(this.radius, Math.min(3000 - this.radius, this.y));
+        
+        // Khôi phục lại speed ban đầu
+        this.speed = originalSpeed;
+        this.chargeSpeed = originalChargeSpeed;
     }
 
     fireBulletCircle(gameBullets) {

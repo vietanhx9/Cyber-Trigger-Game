@@ -86,7 +86,10 @@ export class Player {
             magnet: 0,
             hammer360: 0,
             giantFireball: 0,
-            dualSlash: 0
+            dualSlash: 0,
+            digitalVenom: 0,
+            empReflector: 0,
+            crystalSplinters: 0
         };
 
         // Trạng thái Power-up tạm thời
@@ -118,6 +121,12 @@ export class Player {
         this.shadowDashTimer = 0; // Sát thủ
         this.shadowDashAngle = 0; // Sát thủ
         this.shadowDashHitEnemies = new Set(); // Sát thủ
+        
+        this.isDashingTimer = 0; // Thời gian còn lại của Dash vật lý
+        
+        // Vận tốc cho quán tính trong trạng thái Zero Gravity
+        this.vx = 0;
+        this.vy = 0;
     }
 
     update(keys, mouse, canvasWidth, canvasHeight, camera, deltaTime) {
@@ -130,6 +139,12 @@ export class Player {
         // Cập nhật hồi chiêu kỹ năng
         if (this.dashCooldown > 0) this.dashCooldown -= deltaTime;
         if (this.shockwaveCooldown > 0) this.shockwaveCooldown -= deltaTime;
+
+        // Cập nhật bộ đếm thời gian lướt
+        if (this.isDashingTimer > 0) {
+            this.isDashingTimer -= deltaTime;
+            if (this.isDashingTimer < 0) this.isDashingTimer = 0;
+        }
 
         // Xử lý các bóng mờ di chuyển
         if (this.ghostTrails.length > 0) {
@@ -190,8 +205,34 @@ export class Player {
                 dy *= 0.7071;
             }
 
-            this.x += dx * currentSpeed;
-            this.y += dy * currentSpeed;
+            const isZeroGravity = window.gameEngine && window.gameEngine.disasterActive && window.gameEngine.disasterType === 'zero_gravity';
+            if (isZeroGravity) {
+                // Acceleration: add to velocity
+                const acc = 0.15 * currentSpeed;
+                this.vx += dx * acc;
+                this.vy += dy * acc;
+                
+                // Cap velocity to currentSpeed
+                const speedSquared = this.vx * this.vx + this.vy * this.vy;
+                if (speedSquared > currentSpeed * currentSpeed) {
+                    const speedVal = Math.sqrt(speedSquared);
+                    this.vx = (this.vx / speedVal) * currentSpeed;
+                    this.vy = (this.vy / speedVal) * currentSpeed;
+                }
+                
+                // Apply drag: 4% friction
+                this.vx *= 0.96;
+                this.vy *= 0.96;
+                
+                this.x += this.vx;
+                this.y += this.vy;
+            } else {
+                // Standard movement (non-zero gravity)
+                this.vx = dx * currentSpeed;
+                this.vy = dy * currentSpeed;
+                this.x += this.vx;
+                this.y += this.vy;
+            }
         }
 
         // Giới hạn trong bản đồ thế giới (World size = 3000x3000px)

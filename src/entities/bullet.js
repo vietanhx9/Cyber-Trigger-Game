@@ -180,7 +180,7 @@ export class HammerWave {
 
 // Sub-Weapon: Homing Missile (Tên lửa tầm nhiệt tự dẫn)
 export class HomingMissile {
-    constructor(x, y, target, damage, isEnemyMissile = false) {
+    constructor(x, y, target, damage, isEnemyMissile = false, color = null) {
         this.x = x;
         this.y = y;
         this.target = target;
@@ -190,7 +190,7 @@ export class HomingMissile {
         this.radius = 6;
         this.angle = target ? Vector.angle(x, y, target.x, target.y) : 0;
         this.life = 4000; // Hủy sau 4 giây bay nếu không trúng gì
-        this.color = isEnemyMissile ? '#ff3131' : '#ff9f00'; // Neon Orange cho player, Đỏ cho Boss
+        this.color = color || (isEnemyMissile ? '#ff3131' : '#ff9f00'); // Neon Orange cho player, Đỏ cho Boss
         this.trail = [];
     }
 

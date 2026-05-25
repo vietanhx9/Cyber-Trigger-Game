@@ -3,6 +3,8 @@ export class SoundManager {
         this.ctx = null;
         this.muted = false;
         this.musicIntervalId = null;
+        this.musicTimeoutId = null;
+        this.musicFilter = null;
         this.musicStep = 0;
     }
 
@@ -10,6 +12,12 @@ export class SoundManager {
         if (this.ctx) return;
         // Khởi tạo AudioContext khi người dùng tương tác
         this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        // Khởi tạo bộ lọc thông thấp (lowpass) toàn cục cho âm nhạc nền
+        this.musicFilter = this.ctx.createBiquadFilter();
+        this.musicFilter.type = 'lowpass';
+        this.musicFilter.frequency.setValueAtTime(20000, this.ctx.currentTime);
+        this.musicFilter.connect(this.ctx.destination);
     }
 
     toggleMute() {
@@ -29,23 +37,40 @@ export class SoundManager {
     startMusic() {
         if (this.muted) return;
         this.init();
-        if (this.musicIntervalId) return;
+        if (this.musicTimeoutId) return;
 
         this.musicStep = 0;
-        const stepTime = 130; // 130ms mỗi nhịp tương ứng khoảng 115 BPM
 
-        this.musicIntervalId = setInterval(() => {
-            if (this.muted || !this.ctx) return;
-            // Đảm bảo chỉ phát nhạc khi game đang chạy
-            if (window.gameEngine && window.gameEngine.state === 'PLAYING') {
+        const playNext = () => {
+            if (this.muted || !this.ctx) {
+                this.musicTimeoutId = null;
+                return;
+            }
+            // Đảm bảo chỉ phát nhạc khi game đang chạy hoặc trong màn nâng cấp
+            if (window.gameEngine && (window.gameEngine.state === 'PLAYING' || window.gameEngine.state === 'UPGRADE' || window.gameEngine.state === 'SUPER_UPGRADE')) {
                 this.playMusicStep();
+                
+                // Nhịp độ động: mặc định 130ms. Đẩy tempo lên 1.25x khi chiến đấu với Boss (cắt nhỏ thời gian nhịp còn 104ms)
+                let stepTime = 130;
+                const hasBoss = window.gameEngine.enemies && window.gameEngine.enemies.some(e => e.type === 'boss' && e.hp > 0);
+                if (hasBoss || (window.gameEngine.activeBoss && window.gameEngine.activeBoss.hp > 0)) {
+                    stepTime = Math.floor(130 / 1.25);
+                }
+                
+                this.musicTimeoutId = setTimeout(playNext, stepTime);
             } else {
                 this.stopMusic();
             }
-        }, stepTime);
+        };
+
+        playNext();
     }
 
     stopMusic() {
+        if (this.musicTimeoutId) {
+            clearTimeout(this.musicTimeoutId);
+            this.musicTimeoutId = null;
+        }
         if (this.musicIntervalId) {
             clearInterval(this.musicIntervalId);
             this.musicIntervalId = null;
@@ -54,6 +79,18 @@ export class SoundManager {
 
     playMusicStep() {
         const now = this.ctx.currentTime;
+        
+        // Cập nhật tần số bộ lọc nhạc theo HP của người chơi (muffled khi máu dưới 30%)
+        if (window.gameEngine && window.gameEngine.player) {
+            const player = window.gameEngine.player;
+            const hpRatio = player.hp / player.maxHp;
+            const targetFreq = hpRatio < 0.3 ? 380 : 20000;
+            if (this.musicFilter) {
+                this.musicFilter.frequency.setTargetAtTime(targetFreq, now, 0.1);
+            }
+        } else if (this.musicFilter) {
+            this.musicFilter.frequency.setValueAtTime(20000, now);
+        }
         
         // 1. Kick drum mỗi 4 nốt (0, 4, 8, 12)
         if (this.musicStep % 4 === 0) {
@@ -67,7 +104,7 @@ export class SoundManager {
             gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
             
             osc.connect(gain);
-            gain.connect(this.ctx.destination);
+            gain.connect(this.musicFilter || this.ctx.destination);
             osc.start(now);
             osc.stop(now + 0.1);
         }
@@ -83,7 +120,7 @@ export class SoundManager {
             gain.gain.exponentialRampToValueAtTime(0.001, now + 0.03);
             
             osc.connect(gain);
-            gain.connect(this.ctx.destination);
+            gain.connect(this.musicFilter || this.ctx.destination);
             osc.start(now);
             osc.stop(now + 0.03);
         }
@@ -114,7 +151,7 @@ export class SoundManager {
             
             osc.connect(filter);
             filter.connect(gain);
-            gain.connect(this.ctx.destination);
+            gain.connect(this.musicFilter || this.ctx.destination);
             
             osc.start(now);
             osc.stop(now + 0.12);

@@ -1,13 +1,15 @@
 export class FloatingText {
-    constructor(x, y, text, color, size = 16) {
+    constructor(x, y, text, color, size = 16, isRainbow = false) {
         this.x = x;
         this.y = y;
         this.text = text;
         this.color = color;
         this.size = size;
+        this.isRainbow = isRainbow;
         this.alpha = 1.0;
         this.vy = -1.2; // Tốc độ trôi lên
         this.vx = (Math.random() - 0.5) * 0.6; // Bay xéo nhẹ
+        this.hueOffset = Math.random() * 360; // Khởi tạo lệch màu ngẫu nhiên cho cầu vồng mượt
     }
 
     update() {
@@ -23,7 +25,14 @@ export class FloatingText {
         ctx.save();
         ctx.globalAlpha = this.alpha;
         ctx.font = `bold ${this.size}px 'Orbitron', sans-serif`;
-        ctx.fillStyle = this.color;
+        
+        if (this.isRainbow) {
+            const hue = (Date.now() / 3 + this.hueOffset) % 360;
+            ctx.fillStyle = `hsl(${hue}, 100%, 65%)`;
+        } else {
+            ctx.fillStyle = this.color;
+        }
+        
         ctx.strokeStyle = '#000000';
         ctx.lineWidth = 3;
         ctx.textAlign = 'center';

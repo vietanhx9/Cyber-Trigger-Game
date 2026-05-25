@@ -1319,3 +1319,50 @@ canvas {
         gap: 10px;
     }
 }
+
+/* Glitch Disaster Screen Overlay Effect */
+.glitch-active {
+    animation: screen-glitch 0.25s infinite;
+}
+
+@keyframes screen-glitch {
+    0% {
+        transform: translate(0, 0) skew(0deg);
+        filter: hue-rotate(0deg) contrast(1);
+    }
+    10% {
+        transform: translate(-2px, 1px) skew(-0.5deg);
+        filter: hue-rotate(5deg) contrast(1.05);
+    }
+    20% {
+        transform: translate(1px, -2px) skew(0.5deg);
+        filter: hue-rotate(-5deg) contrast(0.95);
+    }
+    30% {
+        transform: translate(-1px, 2px) skew(-1deg);
+        filter: hue-rotate(10deg) contrast(1.1);
+    }
+    40% {
+        transform: translate(2px, -1px) skew(1deg);
+        filter: hue-rotate(-10deg) contrast(0.9);
+    }
+    50% {
+        transform: translate(-2px, -2px) skew(0deg);
+    }
+    60% {
+        transform: translate(1px, 1px) skew(-0.5deg);
+    }
+    70% {
+        transform: translate(-1px, -1px) skew(0.5deg);
+    }
+    80% {
+        transform: translate(2px, 2px) skew(0deg);
+    }
+    90% {
+        transform: translate(-1px, -2px) skew(-0.5deg);
+    }
+    100% {
+        transform: translate(0, 0) skew(0deg);
+        filter: hue-rotate(0deg) contrast(1);
+    }
+}

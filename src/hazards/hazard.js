@@ -105,6 +105,9 @@ export class Hazard {
         sounds.playExplosion();
         gameEngine.triggerScreenShake(12, 250);
         gameEngine.blastRings.push(new BlastRing(this.x, this.y, this.radius, this.color));
+        if (gameEngine.addGridDistortion) {
+            gameEngine.addGridDistortion(this.x, this.y, this.radius * 1.5, 30, 450);
+        }
         
         // Sát thương nổ lan Player
         const distToPlayer = Vector.dist(this.x, this.y, gameEngine.player.x, gameEngine.player.y);
