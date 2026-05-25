@@ -110,6 +110,88 @@ export class Pillar {
             ctx.arc(0, 0, 5, 0, Math.PI * 2);
             ctx.fill();
 
+        } else if (theme === 'ice') {
+            // --- ICE THEME: Jagged Glowing Crystal Ice Spire ---
+            // 1. Quầng sáng xanh băng tuyết (Outer Glow)
+            ctx.globalAlpha = 0.25;
+            ctx.fillStyle = '#00f0ff';
+            ctx.beginPath();
+            ctx.arc(0, 0, this.radius + 8, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 2. Tháp tinh thể băng (Sharp crystal shape)
+            ctx.globalAlpha = 0.9;
+            ctx.fillStyle = '#a5f3fc'; // Màu băng lạnh lùng
+            ctx.strokeStyle = '#ffffff'; // Viền tuyết trắng sáng
+            ctx.lineWidth = 3.5;
+            ctx.beginPath();
+            // Vẽ tinh thể lục giác góc cạnh nhọn
+            const crystalSides = 6;
+            for (let i = 0; i < crystalSides; i++) {
+                const angle = (Math.PI * 2 / crystalSides) * i - Math.PI / 2;
+                // Tạo đỉnh nhọn nhô hẳn lên ở đầu (i = 0)
+                const r = (i === 0) ? this.radius * 1.15 : this.radius * 0.9;
+                const px = Math.cos(angle) * r;
+                const py = Math.sin(angle) * r;
+                if (i === 0) ctx.moveTo(px, py);
+                else ctx.lineTo(px, py);
+            }
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // 3. Vẽ vân nứt tinh thể băng sắc sảo bên trong
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(0, -this.radius * 1.1);
+            ctx.lineTo(0, this.radius * 0.3);
+            ctx.moveTo(0, this.radius * 0.3);
+            ctx.lineTo(-this.radius * 0.5, this.radius * 0.7);
+            ctx.moveTo(0, this.radius * 0.3);
+            ctx.lineTo(this.radius * 0.5, this.radius * 0.7);
+            ctx.stroke();
+
+        } else if (theme === 'highland') {
+            // --- HIGHLAND THEME: Ancient Megalith Stone with Glowing Runes ---
+            // 1. Quầng sáng cổ xưa huyền bí (Outer Glow)
+            ctx.globalAlpha = 0.25;
+            ctx.strokeStyle = '#d946ef'; // Sáng hồng tím ma thuật
+            ctx.lineWidth = 8;
+            ctx.beginPath();
+            ctx.arc(0, 0, this.radius + 4, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // 2. Thân cột đá tảng cổ (Rough rectangular monolith)
+            ctx.globalAlpha = 1.0;
+            ctx.fillStyle = '#334155'; // Màu đá xám sẫm phong hóa
+            ctx.strokeStyle = '#475569'; // Viền đá cũ
+            ctx.lineWidth = 4;
+            
+            // Vẽ đá tảng góc cạnh
+            ctx.beginPath();
+            ctx.moveTo(-this.radius * 0.8, -this.radius);
+            ctx.lineTo(this.radius * 0.7, -this.radius * 0.95);
+            ctx.lineTo(this.radius * 0.9, this.radius * 0.9);
+            ctx.lineTo(-this.radius * 0.85, this.radius * 0.95);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // 3. Vẽ chữ rune phát sáng ma thuật
+            ctx.strokeStyle = '#d946ef';
+            ctx.lineWidth = 2.5;
+            ctx.beginPath();
+            // Biểu tượng chữ rune cổ đại (dạng chữ Y/X kết hợp nét thẳng)
+            ctx.moveTo(0, -this.radius * 0.5);
+            ctx.lineTo(0, this.radius * 0.5);
+            ctx.moveTo(-this.radius * 0.4, -this.radius * 0.2);
+            ctx.lineTo(0, 0);
+            ctx.lineTo(this.radius * 0.4, -this.radius * 0.2);
+            ctx.moveTo(-this.radius * 0.3, this.radius * 0.4);
+            ctx.lineTo(this.radius * 0.3, this.radius * 0.4);
+            ctx.stroke();
+            
         } else {
             // --- CYBER THEME (Default): Glowing Octagonal Neon Column ---
             // 1. Quầng sáng cột bát giác (Outer Glow)
@@ -265,6 +347,88 @@ export class Barrel {
             ctx.moveTo(6, -5); ctx.lineTo(14, 5);
             ctx.stroke();
             ctx.restore();
+
+        } else if (theme === 'ice') {
+            // --- ICE THEME: Frozen Explosive Ice Barrel ---
+            // 1. Quầng sáng xanh tuyết giá (Outer Glow)
+            ctx.globalAlpha = 0.35;
+            ctx.fillStyle = '#00f0ff';
+            ctx.beginPath();
+            ctx.arc(0, 0, this.radius * 1.8, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 2. Thùng bọc băng đóng tuyết (Frozen Core)
+            ctx.globalAlpha = 1.0;
+            ctx.fillStyle = '#0f172a'; // Thùng sắt lạnh
+            ctx.strokeStyle = '#00f0ff'; // Viền băng cyan
+            ctx.lineWidth = 2.5;
+            ctx.beginPath();
+            ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            // 3. Vẽ các nhũ băng đọng (Icicles hanging)
+            ctx.fillStyle = '#e0f2fe';
+            ctx.beginPath();
+            // Nhũ băng bên trái
+            ctx.moveTo(-this.radius * 0.7, 0);
+            ctx.lineTo(-this.radius * 0.5, this.radius * 0.5);
+            ctx.lineTo(-this.radius * 0.3, 0);
+            // Nhũ băng ở giữa
+            ctx.moveTo(-this.radius * 0.2, 0);
+            ctx.lineTo(0, this.radius * 0.75);
+            ctx.lineTo(this.radius * 0.2, 0);
+            // Nhũ băng bên phải
+            ctx.moveTo(this.radius * 0.3, 0);
+            ctx.lineTo(this.radius * 0.5, this.radius * 0.5);
+            ctx.lineTo(this.radius * 0.7, 0);
+            ctx.fill();
+
+            // 4. Biểu tượng bông tuyết ở tâm
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 3) {
+                ctx.moveTo(0, 0);
+                ctx.lineTo(Math.cos(angle) * 7, Math.sin(angle) * 7);
+            }
+            ctx.stroke();
+
+        } else if (theme === 'highland') {
+            // --- HIGHLAND THEME: Runic Magic Barrel ---
+            // 1. Quầng sáng ma thuật tím (Outer Glow)
+            ctx.globalAlpha = 0.3;
+            ctx.fillStyle = '#d946ef';
+            ctx.beginPath();
+            ctx.arc(0, 0, this.radius * 1.8, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 2. Thùng đá ma pháp (Stony Runic Core)
+            ctx.globalAlpha = 1.0;
+            ctx.fillStyle = '#1e293b'; // Màu đá xanh đen tối
+            ctx.strokeStyle = '#d946ef'; // Viền hồng tím ma thuật
+            ctx.lineWidth = 2.5;
+            ctx.beginPath();
+            ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            // 3. Đường nứt ma thuật rực hồng
+            ctx.strokeStyle = '#f472b6';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(-this.radius * 0.6, -this.radius * 0.4);
+            ctx.lineTo(0, 0);
+            ctx.lineTo(this.radius * 0.6, -this.radius * 0.4);
+            ctx.moveTo(0, 0);
+            ctx.lineTo(0, this.radius * 0.75);
+            ctx.stroke();
+
+            // 4. Lõi năng lượng ma thuật phát sáng ở tâm
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(0, 0, 4, 0, Math.PI * 2);
+            ctx.fill();
 
         } else {
             // --- CYBER THEME (Default): Glowing Neon Canister ---

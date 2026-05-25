@@ -448,8 +448,8 @@ class Game {
     }
 
     startGame() {
-        // Random bản đồ khi bắt đầu game
-        const mapThemes = ['cyber', 'jungle', 'desert'];
+        // Random bản đồ khi bắt đầu game (5 loại bản đồ)
+        const mapThemes = ['cyber', 'jungle', 'desert', 'ice', 'highland'];
         this.mapTheme = mapThemes[Math.floor(Math.random() * mapThemes.length)];
 
         // Tạo lại các thực thể
@@ -577,7 +577,7 @@ class Game {
             this.barrels.push(new Barrel(bx, by));
         }
         
-        // Khởi tạo các hạt nền đặc trưng cho từng bản đồ (đom đóm rừng, cát sa mạc, bụi vũ trụ)
+        // Khởi tạo các hạt nền đặc trưng cho từng bản đồ (đom đóm, cát, tuyết rơi, cánh hoa ma thuật, bụi vũ trụ)
         this.stars = [];
         if (this.mapTheme === 'jungle') {
             const fireflyColors = ['#39ff14', '#aacc00', '#55ff00', '#76ff03'];
@@ -586,7 +586,7 @@ class Game {
                 this.stars.push({
                     x: Math.random() * this.worldSize,
                     y: Math.random() * this.worldSize,
-                    radius: 1.2 + Math.random() * 1.6, // Đom đóm to hơn hạt bụi thường
+                    radius: 1.2 + Math.random() * 1.6,
                     color: fireflyColors[Math.floor(Math.random() * fireflyColors.length)],
                     alpha: baseAlpha,
                     baseAlpha: baseAlpha,
@@ -600,10 +600,40 @@ class Game {
                 this.stars.push({
                     x: Math.random() * this.worldSize,
                     y: Math.random() * this.worldSize,
-                    radius: 0.6 + Math.random() * 1.0, // Hạt cát nhỏ mịn trôi nổi
+                    radius: 0.6 + Math.random() * 1.0,
                     color: sandColors[Math.floor(Math.random() * sandColors.length)],
                     alpha: 0.15 + Math.random() * 0.3,
                     speed: 0.4 + Math.random() * 1.2
+                });
+            }
+        } else if (this.mapTheme === 'ice') {
+            // Tuyết rơi vĩnh cửu
+            const snowColors = ['#ffffff', '#e0f2fe', '#bae6fd', '#f8fafc'];
+            for (let i = 0; i < 150; i++) {
+                this.stars.push({
+                    x: Math.random() * this.worldSize,
+                    y: Math.random() * this.worldSize,
+                    radius: 1.0 + Math.random() * 2.0, // Hạt tuyết to nhỏ khác nhau
+                    color: snowColors[Math.floor(Math.random() * snowColors.length)],
+                    alpha: 0.3 + Math.random() * 0.5,
+                    speed: 0.5 + Math.random() * 1.2,
+                    wobble: Math.random() * 100,
+                    wobbleSpeed: 0.01 + Math.random() * 0.03
+                });
+            }
+        } else if (this.mapTheme === 'highland') {
+            // Cánh hoa anh đào/lá phong ma thuật bay lượn
+            const petalColors = ['#f472b6', '#c084fc', '#e879f9', '#a78bfa', '#f43f5e'];
+            for (let i = 0; i < 100; i++) {
+                this.stars.push({
+                    x: Math.random() * this.worldSize,
+                    y: Math.random() * this.worldSize,
+                    radius: 1.5 + Math.random() * 2.0, // Cánh hoa to bay lãng mạn
+                    color: petalColors[Math.floor(Math.random() * petalColors.length)],
+                    alpha: 0.25 + Math.random() * 0.45,
+                    speed: 0.3 + Math.random() * 0.8,
+                    wave: Math.random() * 100,
+                    waveSpeed: 0.005 + Math.random() * 0.015
                 });
             }
         } else {
@@ -624,12 +654,16 @@ class Game {
         const mapNames = {
             'cyber': 'BẢN ĐỒ CYBERPUNK CỔ ĐIỂN',
             'jungle': 'THUNG LŨNG RỪNG RẬM / JUNGLE VALLEY',
-            'desert': 'HẺM NÚI SA MẠC / DESERT CANYON'
+            'desert': 'HẺM NÚI SA MẠC / DESERT CANYON',
+            'ice': 'HỒ BĂNG GIÁ VĨNH CỬU / ETERNAL FROST',
+            'highland': 'CAO NGUYÊN MA THUẬT / MAGICAL HIGHLAND'
         };
         const mapColors = {
             'cyber': '#00f0ff',
             'jungle': '#39ff14',
-            'desert': '#e9c46a'
+            'desert': '#e9c46a',
+            'ice': '#a5f3fc',
+            'highland': '#d946ef'
         };
         this.floatingTexts.push(new FloatingText(
             this.player.x, 
@@ -1150,7 +1184,7 @@ class Game {
         this.camera.x = Math.max(0, Math.min(this.worldSize - this.canvas.width, this.camera.x));
         this.camera.y = Math.max(0, Math.min(this.worldSize - this.canvas.height, this.camera.y));
 
-        // Cập nhật hạt bụi vũ trụ / đom đóm / gió cát nền của bản đồ
+        // Cập nhật hạt bụi vũ trụ / đom đóm / gió cát / tuyết rơi / cánh hoa nền của bản đồ
         if (this.stars) {
             this.stars.forEach(star => {
                 if (this.mapTheme === 'jungle') {
@@ -1178,6 +1212,30 @@ class Game {
                         star.x = 0;
                         star.y = Math.random() * this.worldSize;
                     }
+                } else if (this.mapTheme === 'ice') {
+                    // Tuyết rơi chậm trôi nghiêng xuống dưới kèm wobble hình sin ngang
+                    star.wobble += star.wobbleSpeed * (deltaTime / 16);
+                    star.x += Math.sin(star.wobble) * 0.18 * (deltaTime / 16);
+                    star.y += star.speed * 0.8 * (deltaTime / 16);
+                    
+                    if (star.y > this.worldSize) {
+                        star.y = 0;
+                        star.x = Math.random() * this.worldSize;
+                    }
+                    if (star.x < 0) star.x += this.worldSize;
+                    if (star.x > this.worldSize) star.x -= this.worldSize;
+                } else if (this.mapTheme === 'highland') {
+                    // Cánh hoa ma thuật bay lượn mềm mại hình sin ngang
+                    star.wave += star.waveSpeed * (deltaTime / 16);
+                    star.x += star.speed * 0.7 * (deltaTime / 16);
+                    star.y += Math.sin(star.wave) * 0.35 * (deltaTime / 16);
+                    
+                    if (star.x > this.worldSize) {
+                        star.x = 0;
+                        star.y = Math.random() * this.worldSize;
+                    }
+                    if (star.y < 0) star.y += this.worldSize;
+                    if (star.y > this.worldSize) star.y -= this.worldSize;
                 }
             });
         }
@@ -3019,6 +3077,12 @@ class Game {
         } else if (this.mapTheme === 'desert') {
             bgStyle = '#140d07'; // Dusty canyon brown
             gridStroke = 'rgba(244, 164, 96, 0.08)'; // Warm sandy grid
+        } else if (this.mapTheme === 'ice') {
+            bgStyle = '#021625'; // Deep frosty blue-black
+            gridStroke = 'rgba(165, 243, 252, 0.08)'; // Icy blue grid
+        } else if (this.mapTheme === 'highland') {
+            bgStyle = '#0e0d16'; // Misty highland night violet-black
+            gridStroke = 'rgba(217, 70, 239, 0.08)'; // Purple/magenta grid
         }
         
         this.ctx.fillStyle = bgStyle;
@@ -3137,6 +3201,12 @@ class Game {
         } else if (this.mapTheme === 'desert') {
             boundaryGlow = 'rgba(212, 140, 72, 0.3)'; // Desert orange glow
             boundaryCore = '#d48c48'; // Desert orange core
+        } else if (this.mapTheme === 'ice') {
+            boundaryGlow = 'rgba(0, 240, 255, 0.35)'; // Icy cyan glow
+            boundaryCore = '#00f0ff'; // Icy cyan core
+        } else if (this.mapTheme === 'highland') {
+            boundaryGlow = 'rgba(217, 70, 239, 0.35)'; // Highland magenta glow
+            boundaryCore = '#d946ef'; // Highland magenta core
         }
 
         this.ctx.save();
