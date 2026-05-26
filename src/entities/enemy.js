@@ -604,7 +604,7 @@ export class Enemy {
 
 // Boss Entity (Giant Monster)
 export class Boss extends Enemy {
-    constructor(x, y, bossType = null) {
+    constructor(x, y, bossType = null, statMultiplier = 1.0) {
         super(x, y, 1, 'boss');
         
         const bossTypes = ['yellow_intruder', 'neon_vortex', 'synapse_reaper', 'arch_overseer', 'grid_infection'];
@@ -664,6 +664,9 @@ export class Boss extends Enemy {
                 this.isClone = false;
                 break;
         }
+        
+        this.maxHp = Math.floor(this.maxHp * statMultiplier);
+        this.damage = Math.floor(this.damage * statMultiplier);
         
         this.hp = this.maxHp;
         this.xpValue = 60;

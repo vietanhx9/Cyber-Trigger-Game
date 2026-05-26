@@ -524,13 +524,12 @@ class Game {
         if (isBoss) {
             if (enemy.silentDeath) {
                 // Do nothing, silent death from split
-            } else if (enemy.isClone) {
-                const otherClonesAlive = this.enemies.some(e => e instanceof Boss && e.bossType === 'grid_infection' && e.isClone && e !== enemy && e.hp > 0);
-                if (!otherClonesAlive) {
+            } else {
+                // Check if this is the last Boss alive in the enemies list (excluding the current one being killed)
+                const otherBossesAlive = this.enemies.some(e => e instanceof Boss && e !== enemy && e.hp > 0 && !e.silentDeath);
+                if (!otherBossesAlive) {
                     isLastBoss = true;
                 }
-            } else {
-                isLastBoss = true;
             }
         }
 
@@ -1059,7 +1058,26 @@ class Game {
             }
         }
 
-        // Xử lý Cảnh báo Boss & Spawn Boss định kỳ mỗi 60 giây
+        // Cập nhật bossSpawnInterval dựa trên level hiện tại của player
+        let targetInterval = 60;
+        if (this.player.level > 11) {
+            targetInterval = 30;
+        } else if (this.player.level > 8) {
+            targetInterval = 30;
+        } else if (this.player.level > 5) {
+            targetInterval = 45;
+        }
+        
+        if (this.bossSpawnInterval !== targetInterval) {
+            const diff = targetInterval - this.bossSpawnInterval;
+            this.bossSpawnInterval = targetInterval;
+            if (!this.bossWarningActive) {
+                // Điều chỉnh mốc tiếp theo tương ứng để không bị chậm trễ
+                this.nextBossTime = Math.max(this.gameTime, this.nextBossTime + diff);
+            }
+        }
+
+        // Xử lý Cảnh báo Boss & Spawn Boss định kỳ
         if (this.gameTime >= this.nextBossTime && !this.bossWarningActive) {
             this.bossWarningActive = true;
             this.bossWarningTimer = 3000; // 3 giây nhấp nháy còi báo
@@ -1078,40 +1096,80 @@ class Game {
                 if (warningOverlay) warningOverlay.classList.add('hidden');
                 this.bossWarningActive = false;
                 
-                // Spawn Boss ngay gần phi thuyền
                 const angle = Math.random() * Math.PI * 2;
-                const bx = this.player.x + Math.cos(angle) * 350;
-                const by = this.player.y + Math.sin(angle) * 350;
+                let bossCount = 1;
+                let multiplier = 1.0;
                 
-                // Chọn ngẫu nhiên loại Boss
-                this.activeBoss = new Boss(bx, by);
-                this.enemies.push(this.activeBoss);
+                if (this.player.level > 11) {
+                    bossCount = 2;
+                    multiplier = 1.5;
+                } else if (this.player.level > 8) {
+                    bossCount = 1;
+                    multiplier = 1.4;
+                } else if (this.player.level > 5) {
+                    bossCount = 1;
+                    multiplier = 1.2;
+                }
+                
+                if (bossCount === 2) {
+                    // Spawn 2 boss ngẫu nhiên đối xứng qua phi thuyền
+                    const bx1 = this.player.x + Math.cos(angle) * 350;
+                    const by1 = this.player.y + Math.sin(angle) * 350;
+                    const bx2 = this.player.x + Math.cos(angle + Math.PI) * 350;
+                    const by2 = this.player.y + Math.sin(angle + Math.PI) * 350;
+                    
+                    const bossTypes = ['yellow_intruder', 'neon_vortex', 'synapse_reaper', 'arch_overseer', 'grid_infection'];
+                    const type1 = bossTypes[Math.floor(Math.random() * bossTypes.length)];
+                    const type2 = bossTypes[Math.floor(Math.random() * bossTypes.length)];
+                    
+                    const boss1 = new Boss(bx1, by1, type1, multiplier);
+                    const boss2 = new Boss(bx2, by2, type2, multiplier);
+                    
+                    this.enemies.push(boss1);
+                    this.enemies.push(boss2);
+                    this.activeBoss = boss1; // Lưu tham chiếu cho HUD
+                } else {
+                    // Spawn 1 boss
+                    const bx = this.player.x + Math.cos(angle) * 350;
+                    const by = this.player.y + Math.sin(angle) * 350;
+                    
+                    const boss = new Boss(bx, by, null, multiplier);
+                    this.enemies.push(boss);
+                    this.activeBoss = boss;
+                }
+                
                 sounds.playLevelUp();
             }
         }
 
-        // Cập nhật thanh HP Boss và Tên/Màu sắc động
+        // Cập nhật thanh HP Boss và Tên/Màu sắc động (hỗ trợ hiển thị tổng máu của nhiều boss)
         const bossHpContainer = document.getElementById('boss-hp-container');
-        if (this.activeBoss && this.activeBoss.hp > 0) {
+        const activeBosses = this.enemies.filter(e => e instanceof Boss && e.hp > 0 && !e.silentDeath);
+        if (activeBosses.length > 0) {
             if (bossHpContainer) {
                 bossHpContainer.classList.remove('hidden');
-                const bossHpPct = (this.activeBoss.hp / this.activeBoss.maxHp) * 100;
+                
+                const totalHp = activeBosses.reduce((sum, b) => sum + b.hp, 0);
+                const totalMaxHp = activeBosses.reduce((sum, b) => sum + b.maxHp, 0);
+                const bossHpPct = (totalHp / totalMaxHp) * 100;
                 
                 const hpFill = document.getElementById('boss-hp-fill');
+                const bossColor = activeBosses[0].color;
                 if (hpFill) {
                     hpFill.style.width = `${bossHpPct}%`;
-                    hpFill.style.backgroundColor = this.activeBoss.color;
-                    hpFill.style.boxShadow = `0 0 10px ${this.activeBoss.color}`;
+                    hpFill.style.backgroundColor = bossColor;
+                    hpFill.style.boxShadow = `0 0 10px ${bossColor}`;
                 }
                 
                 const bossNameEl = bossHpContainer.querySelector('.boss-name');
                 if (bossNameEl) {
-                    bossNameEl.textContent = `⚠️ CRITICAL TARGET: ${this.activeBoss.name} ⚠️`;
-                    bossNameEl.style.color = this.activeBoss.color;
-                    bossNameEl.style.textShadow = `0 0 5px ${this.activeBoss.color}`;
+                    const uniqueNames = activeBosses.map(b => b.name).filter((v, i, a) => a.indexOf(v) === i);
+                    bossNameEl.textContent = `⚠️ CRITICAL TARGETS: ${uniqueNames.join(' & ')} ⚠️`;
+                    bossNameEl.style.color = bossColor;
+                    bossNameEl.style.textShadow = `0 0 5px ${bossColor}`;
                 }
                 
-                document.getElementById('boss-hp-text').textContent = `${Math.ceil(this.activeBoss.hp)} / ${this.activeBoss.maxHp}`;
+                document.getElementById('boss-hp-text').textContent = `${Math.ceil(totalHp)} / ${totalMaxHp}`;
             }
         } else {
             if (bossHpContainer) bossHpContainer.classList.add('hidden');
