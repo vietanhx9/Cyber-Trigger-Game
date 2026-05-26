@@ -245,13 +245,17 @@ export class HomingMissile {
     findNearestEnemy(enemies) {
         if (enemies.length === 0) return null;
         let nearest = null;
-        let minDist = Infinity;
+        let minDistSq = Infinity;
+        const tx = this.x;
+        const ty = this.y;
+        
         enemies.forEach(enemy => {
-            // Không ngắm bắn Boss nếu Boss đã chết, chỉ ngắm quái còn sống
             if (enemy.hp > 0) {
-                const d = Vector.dist(this.x, this.y, enemy.x, enemy.y);
-                if (d < minDist) {
-                    minDist = d;
+                const dx = tx - enemy.x;
+                const dy = ty - enemy.y;
+                const distSq = dx * dx + dy * dy;
+                if (distSq < minDistSq) {
+                    minDistSq = distSq;
                     nearest = enemy;
                 }
             }
@@ -349,11 +353,15 @@ export class GravitySingularity {
         this.radius = 20 + Math.sin(Date.now() * 0.015) * 10 + ratio * 30;
         
         // Hút quái vật xung quanh
+        const pullRadiusSq = this.pullRadius * this.pullRadius;
         enemies.forEach(enemy => {
             if (enemy.hp > 0 && enemy.type !== 'mine' && enemy.type !== 'portal') {
-                const dist = Vector.dist(this.x, this.y, enemy.x, enemy.y);
-                if (dist < this.pullRadius) {
-                    const angle = Vector.angle(enemy.x, enemy.y, this.x, this.y);
+                const dx = this.x - enemy.x;
+                const dy = this.y - enemy.y;
+                const distSq = dx * dx + dy * dy;
+                if (distSq < pullRadiusSq) {
+                    const dist = Math.sqrt(distSq);
+                    const angle = Math.atan2(dy, dx);
                     // Lực hút tăng dần khi ở gần tâm
                     const pullStrength = (1 - dist / this.pullRadius) * 5.0 * (deltaTime / 16.67);
                     enemy.x += Math.cos(angle) * pullStrength;
@@ -366,10 +374,13 @@ export class GravitySingularity {
         this.damageTimer += deltaTime;
         if (this.damageTimer >= 150) {
             this.damageTimer = 0;
+            const innerPullRadiusSq = (this.pullRadius * 0.8) * (this.pullRadius * 0.8);
             enemies.forEach((enemy, idx) => {
                 if (enemy.hp > 0 && enemy.type !== 'mine' && enemy.type !== 'portal') {
-                    const dist = Vector.dist(this.x, this.y, enemy.x, enemy.y);
-                    if (dist < this.pullRadius * 0.8) {
+                    const dx = this.x - enemy.x;
+                    const dy = this.y - enemy.y;
+                    const distSq = dx * dx + dy * dy;
+                    if (distSq < innerPullRadiusSq) {
                         const tickDmg = Math.max(1, Math.floor(this.damage * 0.15));
                         enemy.hp -= tickDmg;
                         gameEngine.floatingTexts.push(new FloatingText(enemy.x, enemy.y - 10, `${tickDmg}`, '#b026ff', 12));
@@ -384,13 +395,17 @@ export class GravitySingularity {
             gameEngine.triggerScreenShake(12, 350);
             
             // Vẽ vòng nổ blast ring tím rộng
-            gameEngine.blastRings.push(new BlastRing(this.x, this.y, this.maxRadius * 1.5, '#b026ff'));
+            const explosionRadius = this.maxRadius * 1.5;
+            gameEngine.blastRings.push(new BlastRing(this.x, this.y, explosionRadius, '#b026ff'));
             
             // Gây sát thương cực lớn ở vụ nổ cuối cùng
+            const explosionRadiusSq = explosionRadius * explosionRadius;
             enemies.forEach((enemy, idx) => {
                 if (enemy.hp > 0 && enemy.type !== 'mine' && enemy.type !== 'portal') {
-                    const dist = Vector.dist(this.x, this.y, enemy.x, enemy.y);
-                    if (dist < this.maxRadius * 1.5) {
+                    const dx = this.x - enemy.x;
+                    const dy = this.y - enemy.y;
+                    const distSq = dx * dx + dy * dy;
+                    if (distSq < explosionRadiusSq) {
                         const finalDmg = Math.floor(this.damage * 3.5);
                         gameEngine.damageEnemy(enemy, finalDmg, 0, 0, idx);
                     }

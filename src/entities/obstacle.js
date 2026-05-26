@@ -8,6 +8,8 @@ export class Pillar {
         this.neonColor = '#00f0ff'; // Neon xanh cyan phát sáng viền nhẹ
         this.maxHp = 100;
         this.hp = this.maxHp;
+        this.energyCharge = 0;
+        this.maxCharge = 5;
     }
 
     draw(ctx, camera, theme = 'cyber') {
@@ -249,6 +251,23 @@ export class Pillar {
             ctx.beginPath();
             ctx.arc(0, 0, this.radius - 8, -Math.PI / 2, -Math.PI / 2 + (Math.PI * 2 * (this.hp / this.maxHp)));
             ctx.stroke();
+            ctx.restore();
+        }
+
+        // Draw energy charge indicator ring
+        if (this.energyCharge && this.energyCharge > 0) {
+            ctx.save();
+            ctx.strokeStyle = '#fffb00'; // Vàng neon rực rỡ
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.arc(0, 0, this.radius + 6, -Math.PI / 2, -Math.PI / 2 + (Math.PI * 2 * (this.energyCharge / this.maxCharge)));
+            ctx.stroke();
+            
+            ctx.globalAlpha = 0.08 * this.energyCharge;
+            ctx.fillStyle = '#fffb00';
+            ctx.beginPath();
+            ctx.arc(0, 0, this.radius + 6, 0, Math.PI * 2);
+            ctx.fill();
             ctx.restore();
         }
  

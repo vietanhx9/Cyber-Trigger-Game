@@ -837,6 +837,31 @@ canvas {
     box-shadow: inset 0 0 12px rgba(176, 38, 255, 0.4), 0 0 10px rgba(176, 38, 255, 0.2);
 }
 
+#skill-ultimate {
+    border-color: var(--neon-pink);
+    box-shadow: inset 0 0 6px rgba(255, 0, 127, 0.2);
+}
+#skill-ultimate:hover {
+    box-shadow: inset 0 0 12px rgba(255, 0, 127, 0.4), 0 0 10px rgba(255, 0, 127, 0.2);
+}
+
+#skill-ultimate.ready-glow {
+    border-color: #d946ef !important;
+    box-shadow: inset 0 0 12px rgba(217, 70, 239, 0.4), 0 0 15px rgba(217, 70, 239, 0.6) !important;
+    animation: ultimateGlowPulse 0.6s infinite alternate;
+}
+
+@keyframes ultimateGlowPulse {
+    0% {
+        box-shadow: inset 0 0 6px rgba(217, 70, 239, 0.3), 0 0 8px rgba(217, 70, 239, 0.4);
+        transform: scale(1.0);
+    }
+    100% {
+        box-shadow: inset 0 0 16px rgba(217, 70, 239, 0.7), 0 0 25px rgba(217, 70, 239, 0.9);
+        transform: scale(1.05);
+    }
+}
+
 .skill-icon {
     font-size: 1.35rem;
     z-index: 2;
@@ -1445,6 +1470,17 @@ canvas {
     box-shadow: 0 0 12px var(--neon-yellow);
     width: 0%;
     transition: width 0.15s ease-out;
+}
+
+.overclock-bar-fill.active {
+    background: repeating-linear-gradient(45deg, rgba(255,255,255,0.12) 0px, rgba(255,255,255,0.12) 2px, transparent 2px, transparent 8px), linear-gradient(90deg, #00ffff, #00f0ff);
+    box-shadow: 0 0 15px #00f0ff;
+    animation: activeOverclockBarPulse 0.5s infinite alternate;
+}
+
+@keyframes activeOverclockBarPulse {
+    0% { box-shadow: 0 0 10px #00f0ff; }
+    100% { box-shadow: 0 0 20px #00f0ff, inset 0 0 8px rgba(255,255,255,0.8); }
 }
 
 /* Pseudo-element for overclock progress bar light sweep */

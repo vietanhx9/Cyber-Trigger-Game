@@ -29,8 +29,6 @@ export class Particle {
         // Không dùng save/restore & shadowBlur mỗi particle — tốn kém nhất trên Canvas
         ctx.globalAlpha = this.alpha;
         ctx.fillStyle = this.color;
-        ctx.beginPath();
-        ctx.arc(screenX, screenY, this.radius, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.fillRect(screenX - this.radius, screenY - this.radius, this.radius * 2, this.radius * 2);
     }
 }

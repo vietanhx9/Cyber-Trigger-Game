@@ -1,6 +1,8 @@
 export class Vector {
     static dist(x1, y1, x2, y2) {
-        return Math.hypot(x2 - x1, y2 - y1);
+        const dx = x2 - x1;
+        const dy = y2 - y1;
+        return Math.sqrt(dx * dx + dy * dy);
     }
     
     static angle(x1, y1, x2, y2) {

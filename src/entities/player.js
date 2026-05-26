@@ -97,6 +97,10 @@ export class Player {
             nanoDrain: 0
         };
 
+        this.ultimateEnergy = 0;
+        this.hyperDriveActive = false;
+        this.hyperDriveTimer = 0;
+
         // Trạng thái Power-up tạm thời
         this.powerups = {
             doubleShot: 0, // Thời gian còn lại (ms)
@@ -156,6 +160,15 @@ export class Player {
             }
         }
 
+        // Cập nhật thời gian Hyper-Drive
+        if (this.hyperDriveActive) {
+            this.hyperDriveTimer -= deltaTime;
+            if (this.hyperDriveTimer <= 0) {
+                this.hyperDriveActive = false;
+                this.hyperDriveTimer = 0;
+            }
+        }
+
         // Cập nhật hồi chiêu kỹ năng
         if (this.dashCooldown > 0) this.dashCooldown -= deltaTime;
         if (this.shockwaveCooldown > 0) this.shockwaveCooldown -= deltaTime;
@@ -182,6 +195,9 @@ export class Player {
         }
         if (this.plasmaOverloadTimer > 0) {
             currentSpeed *= 1.6; // Xạ thủ tăng tốc khi bật Quá tải Plasma
+        }
+        if (this.hyperDriveActive) {
+            currentSpeed *= 1.5; // Tăng 50% tốc độ di chuyển trong Hyper-Drive
         }
         if (this.overclockActive) {
             if (this.role === 'assassin') {
@@ -278,11 +294,17 @@ export class Player {
     }
 
     takeDamage(amount) {
+        if (this.hyperDriveActive) return false; // Không nhận sát thương khi đang Hyper-Drive!
         if (this.overclockActive) return false; // Không nhận sát thương khi đang Overclock (CPU Hack)!
         if (this.iframe > 0) return false;
+
+        // Nhân đôi sát thương nhận vào nếu Bão mặt trời đang hoạt động
+        if (window.gameEngine && window.gameEngine.weatherActive && window.gameEngine.weatherType === 'solar_flare') {
+            amount *= 2;
+        }
         
         if (this.upgrades.limitBreak > 0) {
-            amount = Math.floor(amount * 1.25);
+            amount = Math.floor(amount * 1.15);
         }
         
         // Nếu có khiên chắn, khiên sẽ đỡ đòn và giảm thời gian khiên đi
@@ -384,6 +406,26 @@ export class Player {
             ctx.lineWidth = 14;
             ctx.beginPath();
             ctx.arc(0, 0, this.radius * 1.5, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        // Hiệu ứng Hyper-Drive phát sáng hồng tím cực mạnh bao quanh
+        if (this.hyperDriveActive) {
+            ctx.save();
+            ctx.globalAlpha = 0.45 + Math.sin(Date.now() * 0.025) * 0.2;
+            ctx.strokeStyle = '#d946ef'; // Magenta
+            ctx.lineWidth = 16;
+            ctx.beginPath();
+            ctx.arc(0, 0, this.radius * 1.6, 0, Math.PI * 2);
+            ctx.stroke();
+            
+            // Vẽ vòng năng lượng ảo ảnh bên trong
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 3;
+            ctx.rotate(Date.now() * 0.005);
+            ctx.beginPath();
+            ctx.arc(0, 0, this.radius * 1.3, 0, Math.PI, false);
             ctx.stroke();
             ctx.restore();
         }

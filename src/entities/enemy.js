@@ -9,6 +9,7 @@ export class Enemy {
     constructor(x, y, level, type = null) {
         this.x = x;
         this.y = y;
+        this.level = level;
         this.angle = 0;
         this.knockbackX = 0;
         this.knockbackY = 0;
@@ -40,15 +41,17 @@ export class Enemy {
 
         // Cài đặt chỉ số cho từng loại quái
         // Chỉ số quái tăng dần theo level game để duy trì độ thử thách
-        const mult = 1 + (level - 1) * 0.15;
+        const hpMult = 1 + (level - 1) * 0.18;
+        const dmgMult = 1 + (level - 1) * 0.10;
+        const speedMult = 1 + (level - 1) * 0.03;
 
         switch (this.type) {
             case 'tanker':
                 this.radius = 32;
-                this.speed = 1.3;
-                this.hp = Math.floor(70 * mult);
+                this.speed = 1.3 * speedMult;
+                this.hp = Math.floor(70 * hpMult);
                 this.maxHp = this.hp;
-                this.damage = 25;
+                this.damage = Math.floor(25 * dmgMult);
                 this.xpValue = 5;
                 this.color = '#b026ff'; // Neon Purple
                 break;
@@ -57,25 +60,25 @@ export class Enemy {
                 this.speed = 0;
                 this.hp = 1;
                 this.maxHp = 1;
-                this.damage = 20;
+                this.damage = Math.floor(20 * dmgMult);
                 this.xpValue = 0;
                 this.color = '#ff9f00'; // Neon Orange for mine flashing
                 break;
             case 'shooter':
                 this.radius = 18;
-                this.speed = 2.0;
-                this.hp = Math.floor(35 * mult);
+                this.speed = 2.0 * speedMult;
+                this.hp = Math.floor(35 * hpMult);
                 this.maxHp = this.hp;
-                this.damage = 10;
+                this.damage = Math.floor(10 * dmgMult);
                 this.xpValue = 4;
                 this.color = '#ff9f00'; // Neon Orange
                 break;
             case 'sniper':
                 this.radius = 16;
-                this.speed = 1.5;
-                this.hp = Math.floor(45 * mult);
+                this.speed = 1.5 * speedMult;
+                this.hp = Math.floor(45 * hpMult);
                 this.maxHp = this.hp;
-                this.damage = 22;
+                this.damage = Math.floor(22 * dmgMult);
                 this.xpValue = 5;
                 this.color = '#ff00ff'; // Neon Magenta
                 this.sniperAimTimer = 0;
@@ -83,7 +86,7 @@ export class Enemy {
             case 'portal':
                 this.radius = 35;
                 this.speed = 0;
-                this.hp = Math.floor(180 * mult); // HP cao
+                this.hp = Math.floor(180 * hpMult); // HP cao
                 this.maxHp = this.hp;
                 this.damage = 0; // Không gây sát thương va chạm
                 this.xpValue = 18; // Điểm kinh nghiệm cao
@@ -92,8 +95,8 @@ export class Enemy {
                 break;
             case 'gold_bug':
                 this.radius = 16;
-                this.speed = 4.2; // Rất nhanh
-                this.hp = Math.floor(40 * mult);
+                this.speed = 4.2 * speedMult; // Rất nhanh
+                this.hp = Math.floor(40 * hpMult);
                 this.maxHp = this.hp;
                 this.damage = 0; // Không gây sát thương va chạm
                 this.xpValue = 35; // Điểm kinh nghiệm rất cao
@@ -103,10 +106,10 @@ export class Enemy {
             case 'runner':
             default:
                 this.radius = 14;
-                this.speed = 3.0;
-                this.hp = Math.floor(20 * mult);
+                this.speed = 3.0 * speedMult;
+                this.hp = Math.floor(20 * hpMult);
                 this.maxHp = this.hp;
-                this.damage = 12;
+                this.damage = Math.floor(12 * dmgMult);
                 this.xpValue = 1;
                 this.color = '#ff007f'; // Neon Pink (Runner mặc định)
                 break;
@@ -303,7 +306,29 @@ export class Enemy {
     }
 
     shootAtTarget(target, gameBullets, isHackedTarget = false) {
-        // Bắn 1 tia đạn hướng tới mục tiêu
+        // Nếu level >= 4, bắn chùm 3 viên cách nhau 150ms
+        if (this.level >= 4) {
+            let count = 0;
+            const shootInterval = setInterval(() => {
+                // Kiểm tra nếu quái đã chết hoặc game đã dừng, dừng bắn
+                if (this.hp <= 0 || (window.gameEngine && window.gameEngine.state !== 'PLAYING')) {
+                    clearInterval(shootInterval);
+                    return;
+                }
+                
+                this.fireSingleBullet(target, gameBullets, isHackedTarget);
+                count++;
+                if (count >= 3) {
+                    clearInterval(shootInterval);
+                }
+            }, 150);
+        } else {
+            this.fireSingleBullet(target, gameBullets, isHackedTarget);
+        }
+    }
+
+    fireSingleBullet(target, gameBullets, isHackedTarget) {
+        if (this.hp <= 0) return;
         const bulletAngle = Vector.angle(this.x, this.y, target.x, target.y);
         const bSpeed = 5;
         const vx = Math.cos(bulletAngle) * bSpeed;
@@ -675,14 +700,23 @@ export class Boss extends Enemy {
 
     update(player, gameBullets, deltaTime, gameEngineRef) {
         const isFrequencyGlitch = gameEngineRef && gameEngineRef.disasterActive && gameEngineRef.disasterType === 'frequency_glitch';
-        const activeDelta = isFrequencyGlitch ? deltaTime * 2 : deltaTime;
+        const isRaged = (this.hp / this.maxHp < 0.40);
         
-        // Tăng tốc độ di chuyển tạm thời của Boss trong Frequency Glitch
+        let activeDelta = isFrequencyGlitch ? deltaTime * 2 : deltaTime;
+        if (isRaged) {
+            activeDelta *= 1.5; // Tăng 50% tốc độ thực hiện hành động/bắn đạn
+        }
+        
+        // Tăng tốc độ di chuyển tạm thời của Boss trong Frequency Glitch và trạng thái Rage
         const originalSpeed = this.speed;
         const originalChargeSpeed = this.chargeSpeed;
         if (isFrequencyGlitch) {
             this.speed *= 2.0;
             if (this.chargeSpeed) this.chargeSpeed *= 2.0;
+        }
+        if (isRaged) {
+            this.speed *= 1.3;
+            if (this.chargeSpeed) this.chargeSpeed *= 1.3;
         }
 
         // Giảm lực đẩy lùi (Boss bị đẩy lùi rất ít)
@@ -1156,6 +1190,12 @@ export class Boss extends Enemy {
     }
 
     draw(ctx, camera) {
+        const originalColor = this.color;
+        const isRaged = (this.hp / this.maxHp < 0.40);
+        if (isRaged) {
+            this.color = Math.floor(Date.now() / 200) % 2 === 0 ? '#ff003c' : originalColor;
+        }
+
         const screenX = this.x - camera.x;
         const screenY = this.y - camera.y;
 
@@ -1518,6 +1558,8 @@ export class Boss extends Enemy {
             
             ctx.restore();
         }
+        
+        this.color = originalColor;
     }
 
     // Helper check view
