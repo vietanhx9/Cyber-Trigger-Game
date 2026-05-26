@@ -476,9 +476,12 @@ class Game {
     }
 
     onEnemyKilled(enemy, enemyIdx) {
+        const actualIdx = this.enemies.indexOf(enemy);
+        if (actualIdx === -1) return; // Đã bị xóa trước đó hoặc không tồn tại
+
         if (enemy.type === 'mine') {
             this.triggerMineExplosion(enemy.x, enemy.y);
-            this.enemies.splice(enemyIdx, 1);
+            this.enemies.splice(actualIdx, 1);
             return;
         }
 
@@ -557,7 +560,7 @@ class Game {
             this.spawnCollectable(enemy.x, enemy.y, enemy.xpValue);
         }
 
-        this.enemies.splice(enemyIdx, 1);
+        this.enemies.splice(actualIdx, 1);
     }
 
     triggerMineExplosion(x, y) {
@@ -2840,14 +2843,13 @@ class Game {
         this.blastRings.push(new BlastRing(x, y, expRadius, blastColor));
         this.addGridDistortion(x, y, expRadius * 1.15, isResonant ? 65 : 40, 500);
 
-        // Phá các đạn xung quanh vụ nổ
-        this.bullets = this.bullets.filter(bullet => {
+        // Phá các đạn xung quanh vụ nổ bằng cách đánh dấu huỷ (set life = -1) thay vì filter trực tiếp làm hỏng loop đạn
+        this.bullets.forEach(bullet => {
             const dist = Vector.dist(x, y, bullet.x, bullet.y);
             if (dist < expRadius) {
+                bullet.life = -1;
                 this.spawnBloodParticles(bullet.x, bullet.y, bullet.color, 3);
-                return false;
             }
-            return true;
         });
 
         // Gây sát thương và đẩy quái vật

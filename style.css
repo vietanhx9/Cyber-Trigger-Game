@@ -365,8 +365,9 @@ canvas {
 .xp-container {
     width: 50%;
     max-width: 600px;
-    background: rgba(10, 15, 30, 0.6);
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    background: rgba(10, 15, 30, 0.75);
+    border: 1px solid rgba(0, 240, 255, 0.2);
+    box-shadow: 0 0 10px rgba(0, 240, 255, 0.05);
     border-radius: 8px;
     padding: 8px 12px;
     display: flex;
@@ -387,10 +388,11 @@ canvas {
 .xp-bar-bg {
     flex-grow: 1;
     height: 10px;
-    background: rgba(255,255,255,0.05);
+    background: rgba(0, 0, 0, 0.45);
     border-radius: 5px;
     overflow: hidden;
-    border: 1px solid rgba(255,255,255,0.1);
+    border: 1px solid rgba(0, 240, 255, 0.25);
+    box-shadow: inset 0 0 4px rgba(0, 240, 255, 0.1);
 }
 
 .xp-bar-fill {
@@ -440,8 +442,9 @@ canvas {
 
 .health-container {
     width: 280px;
-    background: rgba(10, 15, 30, 0.6);
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    background: rgba(10, 15, 30, 0.75);
+    border: 1px solid rgba(255, 49, 49, 0.2);
+    box-shadow: 0 0 10px rgba(255, 49, 49, 0.05);
     border-radius: 8px;
     padding: 10px 14px;
     backdrop-filter: blur(5px);
@@ -468,10 +471,11 @@ canvas {
 .health-bar-bg {
     width: 100%;
     height: 12px;
-    background: rgba(255,255,255,0.05);
+    background: rgba(0, 0, 0, 0.45);
     border-radius: 6px;
     overflow: hidden;
-    border: 1px solid rgba(255,255,255,0.1);
+    border: 1px solid rgba(255, 49, 49, 0.25);
+    box-shadow: inset 0 0 4px rgba(255, 49, 49, 0.1);
 }
 
 .health-bar-fill {
@@ -485,6 +489,10 @@ canvas {
 }
 
 .powerup-badge {
+    position: absolute;
+    top: 75px;
+    left: 50%;
+    transform: translateX(-50%);
     background: rgba(10, 15, 30, 0.85);
     border: 1px solid var(--neon-green);
     box-shadow: var(--shadow-green);
@@ -497,7 +505,7 @@ canvas {
     display: flex;
     align-items: center;
     gap: 6px;
-    margin-bottom: 2px;
+    z-index: 6;
     animation: badgePulse 1s infinite alternate;
 }
 
@@ -1102,53 +1110,57 @@ canvas {
 
 /* 3. Boss Warning Overlay */
 .boss-warning-layer {
-    background: rgba(4, 6, 12, 0.92);
-    z-index: 25; /* Above standard menus */
+    background: rgba(4, 6, 12, 0.2); /* Trực quan hoá: Giữ nền gần như trong suốt để thấy game bên dưới */
+    backdrop-filter: none; /* Tắt làm mờ màn hình để người chơi thấy đường né đạn */
+    z-index: 25; /* Thấp hơn menu nâng cấp nhưng trên màn chơi */
+    pointer-events: none; /* Cho phép click chuột đi xuyên qua để bắn quái */
+    align-items: flex-start; /* Đưa bảng cảnh báo lên phía trên màn hình */
+    padding-top: 100px;
 }
 
 .boss-warning-box {
     text-align: center;
-    padding: 40px;
-    border-radius: 16px;
-    background: rgba(255, 49, 49, 0.04);
+    padding: 15px 30px; /* Thu nhỏ khoảng đệm để bảng gọn gàng hơn */
+    border-radius: 12px;
+    background: rgba(255, 49, 49, 0.08);
     border: 2px dashed var(--neon-red);
-    box-shadow: 0 0 35px rgba(255, 49, 49, 0.15);
+    box-shadow: 0 0 25px rgba(255, 49, 49, 0.15);
     animation: warningBoxPulse 1s infinite alternate;
-    max-width: 500px;
+    max-width: 440px;
     width: 90%;
-    margin: auto;
+    margin: 0 auto;
 }
 
 @keyframes warningBoxPulse {
     from {
-        box-shadow: 0 0 15px rgba(255, 49, 49, 0.1);
+        box-shadow: 0 0 10px rgba(255, 49, 49, 0.1);
         border-color: rgba(255, 49, 49, 0.4);
     }
     to {
-        box-shadow: 0 0 35px rgba(255, 49, 49, 0.35);
+        box-shadow: 0 0 25px rgba(255, 49, 49, 0.35);
         border-color: rgba(255, 49, 49, 1.0);
     }
 }
 
 .boss-warning-title {
-    font-size: 3rem;
+    font-size: 1.8rem; /* Thu nhỏ cỡ chữ tiêu đề */
     font-weight: 900;
-    letter-spacing: 4px;
-    margin-bottom: 15px;
+    letter-spacing: 2px;
+    margin-bottom: 6px;
 }
 
 .boss-warning-msg {
     font-family: var(--font-heading);
-    font-size: 1.1rem;
+    font-size: 0.9rem; /* Thu nhỏ thông tin chi tiết */
     color: #ffffff;
-    letter-spacing: 1.5px;
-    margin-bottom: 25px;
+    letter-spacing: 1px;
+    margin-bottom: 15px;
     text-shadow: 0 0 8px rgba(255, 255, 255, 0.4);
 }
 
 .boss-warning-timer {
     font-family: var(--font-heading);
-    font-size: 5rem;
+    font-size: 3rem; /* Thu nhỏ số đếm ngược */
     font-weight: 900;
     color: var(--neon-yellow);
     text-shadow: 0 0 15px rgba(255, 251, 0, 0.6);
@@ -1156,9 +1168,9 @@ canvas {
 }
 
 @keyframes timerPulse {
-    0% { transform: scale(0.8); opacity: 0.4; }
-    50% { transform: scale(1.15); opacity: 1; }
-    100% { transform: scale(0.8); opacity: 0.4; }
+    0% { transform: scale(0.85); opacity: 0.5; }
+    50% { transform: scale(1.1); opacity: 1; }
+    100% { transform: scale(0.85); opacity: 0.5; }
 }
 
 /* 4. Super Upgrade Menu Colors */
@@ -1426,8 +1438,9 @@ canvas {
 /* HUD Overclock styling */
 .overclock-container {
     width: 280px;
-    background: rgba(10, 15, 30, 0.6);
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    background: rgba(10, 15, 30, 0.75);
+    border: 1px solid rgba(255, 251, 0, 0.2);
+    box-shadow: 0 0 10px rgba(255, 251, 0, 0.05);
     border-radius: 8px;
     padding: 10px 14px;
     backdrop-filter: blur(5px);
@@ -1456,10 +1469,11 @@ canvas {
 .overclock-bar-bg {
     width: 100%;
     height: 12px;
-    background: rgba(255,255,255,0.05);
+    background: rgba(0, 0, 0, 0.45);
     border-radius: 6px;
     overflow: hidden;
-    border: 1px solid rgba(255,255,255,0.1);
+    border: 1px solid rgba(255, 251, 0, 0.25);
+    box-shadow: inset 0 0 4px rgba(255, 251, 0, 0.1);
 }
 
 .overclock-bar-fill {
@@ -1587,4 +1601,33 @@ canvas {
 .debuff-text {
     color: var(--neon-red);
     font-weight: 600;
+}
+
+/* Responsive HUD bottom bar rules to prevent overclock container from being squeezed or clipped on smaller screens */
+@media (max-width: 900px) {
+    .hud-bottom-bar {
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+        width: 100%;
+    }
+    
+    .health-container, .overclock-container {
+        width: 100%;
+        max-width: 280px;
+    }
+    
+    .hud-skills-container {
+        order: -1; /* Place active skills above health and overclock bars */
+        margin-bottom: 4px;
+        width: 100%;
+        max-width: 280px;
+        justify-content: center;
+    }
+}
+
+@media (max-width: 640px) {
+    .powerup-badge {
+        top: 60px;
+    }
 }
