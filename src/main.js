@@ -903,7 +903,7 @@ class Game {
 
     // --- GAME LOOP ---
     loop(currentTime) {
-        if (this.state !== 'PLAYING' && this.state !== 'UPGRADE' && this.state !== 'SUPER_UPGRADE' && this.state !== 'PAUSED') return;
+        if (this.state !== 'PLAYING' && this.state !== 'UPGRADE' && this.state !== 'SUPER_UPGRADE' && this.state !== 'HACKED_SHOP' && this.state !== 'PAUSED') return;
 
         let deltaTime = currentTime - this.lastTime;
         // Chặn deltaTime quá lớn khi người dùng tab-out trình duyệt
