@@ -89,7 +89,12 @@ export class Player {
             dualSlash: 0,
             digitalVenom: 0,
             empReflector: 0,
-            crystalSplinters: 0
+            crystalSplinters: 0,
+            glassCore: 0,
+            overheated: 0,
+            lagSwitch: 0,
+            limitBreak: 0,
+            nanoDrain: 0
         };
 
         // Trạng thái Power-up tạm thời
@@ -127,6 +132,11 @@ export class Player {
         // Vận tốc cho quán tính trong trạng thái Zero Gravity
         this.vx = 0;
         this.vy = 0;
+
+        // Trạng thái Overclock (Hack Mode)
+        this.overclockEnergy = 0; // 0 to 100
+        this.overclockActive = false;
+        this.overclockTimer = 0; // ms
     }
 
     update(keys, mouse, canvasWidth, canvasHeight, camera, deltaTime) {
@@ -135,6 +145,16 @@ export class Player {
         if (this.powerups.shield > 0) this.powerups.shield -= deltaTime;
         if (this.powerups.speedBoost > 0) this.powerups.speedBoost -= deltaTime;
         if (this.iframe > 0) this.iframe -= deltaTime;
+
+        // Cập nhật thời gian Overclock
+        if (this.overclockActive) {
+            this.overclockTimer -= deltaTime;
+            if (this.overclockTimer <= 0) {
+                this.overclockActive = false;
+                this.overclockTimer = 0;
+                this.overclockEnergy = 0;
+            }
+        }
 
         // Cập nhật hồi chiêu kỹ năng
         if (this.dashCooldown > 0) this.dashCooldown -= deltaTime;
@@ -162,6 +182,16 @@ export class Player {
         }
         if (this.plasmaOverloadTimer > 0) {
             currentSpeed *= 1.6; // Xạ thủ tăng tốc khi bật Quá tải Plasma
+        }
+        if (this.overclockActive) {
+            if (this.role === 'assassin') {
+                currentSpeed *= 1.45; // Assassin di chuyển cực nhanh trong Overclock
+            } else {
+                currentSpeed *= 1.25; // Các class khác tăng tốc 25%
+            }
+        }
+        if (window.gameEngine && window.gameEngine.disasterActive && window.gameEngine.disasterType === 'matrix_protocol') {
+            currentSpeed *= 1.3; // Tăng 30% tốc độ di chuyển trong Matrix Protocol
         }
 
         // Giảm 30% tốc độ di chuyển khi có động đất đang hoạt động
@@ -248,7 +278,12 @@ export class Player {
     }
 
     takeDamage(amount) {
+        if (this.overclockActive) return false; // Không nhận sát thương khi đang Overclock (CPU Hack)!
         if (this.iframe > 0) return false;
+        
+        if (this.upgrades.limitBreak > 0) {
+            amount = Math.floor(amount * 1.25);
+        }
         
         // Nếu có khiên chắn, khiên sẽ đỡ đòn và giảm thời gian khiên đi
         if (this.powerups.shield > 0) {
@@ -340,6 +375,18 @@ export class Player {
         }
 
         ctx.rotate(this.angle);
+
+        // Hiệu ứng Overclock phát sáng cực mạnh bao quanh
+        if (this.overclockActive) {
+            ctx.save();
+            ctx.globalAlpha = 0.35 + Math.sin(Date.now() * 0.02) * 0.15;
+            ctx.strokeStyle = '#fffb00';
+            ctx.lineWidth = 14;
+            ctx.beginPath();
+            ctx.arc(0, 0, this.radius * 1.5, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.restore();
+        }
 
         // Hiệu ứng phát sáng neon cho nhân vật (Double-stroke outer glow)
         // 1. Quầng sáng phi thuyền (Outer Glow)

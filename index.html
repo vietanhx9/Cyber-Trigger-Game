@@ -80,6 +80,18 @@
                     </div>
                 </div>
 
+                <!-- HUD Overclock (CPU Hack Mode) -->
+                <div class="overclock-container">
+                    <div class="overclock-text-row">
+                        <span class="overclock-label">CPU OVERCLOCK</span>
+                        <span id="hud-overclock-text">0%</span>
+                    </div>
+                    <div class="overclock-bar-bg">
+                        <div id="hud-overclock-fill" class="overclock-bar-fill" style="width: 0%"></div>
+                    </div>
+                    <span id="overclock-prompt" class="overclock-prompt-pulse hidden">PRESS [Q] TO OVERCLOCK!</span>
+                </div>
+
                 <div id="active-powerup" class="powerup-badge hidden">
                     <span id="powerup-name">DOUBLE SHOT</span>: <span id="powerup-timer">5.0s</span>
                 </div>
@@ -99,8 +111,10 @@
                             <div class="key">W</div>
                             <div class="key-row">
                                 <div class="key">A</div>
-                                <div class="key">S</div>
-                                <div class="key">D</div>
+                                <div class="key-row">
+                                    <div class="key">S</div>
+                                    <div class="key">D</div>
+                                </div>
                             </div>
                             <span>Di chuyển</span>
                         </div>
@@ -114,9 +128,15 @@
                             <div class="key space-key">SPACE</div>
                             <span>Dash (Né đòn)</span>
                         </div>
-                        <div class="control-item">
-                            <div class="key">E</div>
-                            <span>Kích hoạt Kỹ năng Hệ thống</span>
+                        <div class="control-item" style="display: flex; flex-direction: row; gap: 10px; align-items: center;">
+                            <div style="display: flex; flex-direction: column; align-items: center;">
+                                <div class="key">E</div>
+                                <span style="font-size: 0.75rem; margin-top: 2px;">Active Skill</span>
+                            </div>
+                            <div style="display: flex; flex-direction: column; align-items: center;">
+                                <div class="key">Q</div>
+                                <span style="font-size: 0.75rem; margin-top: 2px;">Overclock</span>
+                            </div>
                         </div>
                     </div>
                     <div class="pause-instruction" style="margin-top: 15px; padding-top: 10px; border-top: 1px dashed rgba(255, 255, 255, 0.1); font-size: 0.85rem; color: #cbd5e1; display: flex; justify-content: center; align-items: center; gap: 10px;">
@@ -211,6 +231,18 @@
                 <div id="super-upgrade-choices" class="choices-grid">
                     <!-- Được sinh động bởi game.js -->
                 </div>
+            </div>
+        </div>
+
+        <!-- Màn hình Chợ Đen Mã Độc (Hacked Shop Menu) -->
+        <div id="hacked-shop-menu" class="overlay-layer hidden">
+            <div class="upgrade-container animate-fade-in">
+                <h2 class="upgrade-title neon-pulse-red" style="font-size: 2.2rem; color: #ff3131; text-shadow: 0 0 10px rgba(255, 49, 49, 0.6);">⚠️ CHỢ ĐEN MÃ ĐỘC (BLACK MARKET) ⚠️</h2>
+                <p class="upgrade-subtitle">Ép xung lõi chập mạch bằng cách tiêu hao XP hiện có. Rủi ro cao, lực chiến lớn!</p>
+                <div id="hacked-shop-choices" class="choices-grid">
+                    <!-- Được chèn động bởi main.js -->
+                </div>
+                <button id="btn-close-shop" class="btn-neon neon-pink-border" style="margin-top: 30px; font-size: 0.95rem; padding: 10px 24px;">HỦY KẾT NỐI (THOÁT)</button>
             </div>
         </div>
 

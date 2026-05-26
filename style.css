@@ -1397,3 +1397,158 @@ canvas {
         left: 150%;
     }
 }
+
+/* HUD Overclock styling */
+.overclock-container {
+    width: 280px;
+    background: rgba(10, 15, 30, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    padding: 10px 14px;
+    backdrop-filter: blur(5px);
+    display: flex;
+    flex-direction: column;
+}
+
+.overclock-text-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 6px;
+    font-family: var(--font-heading);
+    font-weight: 700;
+    font-size: 0.9rem;
+}
+
+.overclock-label {
+    color: var(--neon-yellow);
+    text-shadow: 0 0 5px rgba(255, 251, 0, 0.5);
+}
+
+#hud-overclock-text {
+    color: #ffffff;
+}
+
+.overclock-bar-bg {
+    width: 100%;
+    height: 12px;
+    background: rgba(255,255,255,0.05);
+    border-radius: 6px;
+    overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.1);
+}
+
+.overclock-bar-fill {
+    position: relative;
+    overflow: hidden;
+    height: 100%;
+    background: repeating-linear-gradient(45deg, rgba(255,255,255,0.12) 0px, rgba(255,255,255,0.12) 2px, transparent 2px, transparent 8px), linear-gradient(90deg, #ffaa00, var(--neon-yellow));
+    box-shadow: 0 0 12px var(--neon-yellow);
+    width: 0%;
+    transition: width 0.15s ease-out;
+}
+
+/* Pseudo-element for overclock progress bar light sweep */
+.overclock-bar-fill::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -150%;
+    width: 60px;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.45), transparent);
+    transform: skewX(-30deg);
+    animation: bar-light-sweep 2.8s infinite ease-in-out;
+}
+
+.overclock-prompt-pulse {
+    font-family: var(--font-heading);
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--neon-yellow);
+    text-shadow: 0 0 5px rgba(255, 251, 0, 0.6);
+    text-align: center;
+    margin-top: 4px;
+    animation: textPulseOrange 0.6s infinite alternate;
+}
+
+@keyframes textPulseOrange {
+    0% { opacity: 0.3; text-shadow: 0 0 2px rgba(255, 251, 0, 0.2); }
+    100% { opacity: 1.0; text-shadow: 0 0 8px rgba(255, 251, 0, 0.8); }
+}
+
+/* CRT/Scanline glitch effect during Overclock */
+.overclock-glitch-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 4;
+    background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+    background-size: 100% 4px, 6px 100%;
+    animation: glitchNoise 0.15s infinite;
+}
+
+@keyframes glitchNoise {
+    0% { background-position: 0 0; }
+    100% { background-position: 0 10px; }
+}
+
+/* Hacked shop specific styling */
+.hacked-upgrade-card {
+    border-color: rgba(255, 49, 49, 0.4) !important;
+}
+
+.hacked-upgrade-card:hover {
+    border-color: var(--neon-red) !important;
+    box-shadow: 0 15px 45px rgba(255, 49, 49, 0.3) !important;
+}
+
+.hacked-upgrade-card .card-glow-red {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    z-index: -1;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+}
+
+.hacked-upgrade-card:hover .card-glow-red {
+    opacity: 0.15;
+    background: radial-gradient(circle at center, var(--neon-red) 0%, transparent 70%);
+}
+
+.hacked-upgrade-card .card-stat {
+    background: rgba(255, 49, 49, 0.15);
+    border-color: rgba(255, 49, 49, 0.3);
+    color: var(--neon-red);
+}
+
+.hacked-card-cost {
+    margin-top: 10px;
+    font-family: var(--font-heading);
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: var(--neon-yellow);
+    text-shadow: 0 0 5px rgba(255, 251, 0, 0.4);
+}
+
+.hacked-card-cost.insufficient {
+    color: var(--neon-red);
+    text-decoration: line-through;
+    text-shadow: none;
+}
+
+.buff-text {
+    color: var(--neon-green);
+    font-weight: 600;
+}
+
+.debuff-text {
+    color: var(--neon-red);
+    font-weight: 600;
+}

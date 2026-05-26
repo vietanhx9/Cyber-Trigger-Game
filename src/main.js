@@ -2,7 +2,7 @@ import { sounds } from './audio/soundManager.js';
 import { Vector } from './utils/vector.js';
 import { Player } from './entities/player.js';
 import { Enemy, Boss } from './entities/enemy.js';
-import { Bullet, SwordSlash, HammerWave, HomingMissile } from './entities/bullet.js';
+import { Bullet, SwordSlash, HammerWave, HomingMissile, GravitySingularity } from './entities/bullet.js';
 import { Item } from './entities/item.js';
 import { Particle } from './effects/particle.js';
 import { FloatingText } from './effects/floatingText.js';
@@ -10,6 +10,86 @@ import { Hazard } from './hazards/hazard.js';
 import { Pillar, Barrel } from './entities/obstacle.js';
 import { BlastRing } from './effects/blastRing.js';
 import { LightningBolt } from './effects/lightningBolt.js';
+
+class ShadowClone {
+    constructor(x, y, damage) {
+        this.x = x;
+        this.y = y;
+        this.damage = damage;
+        this.lifeMax = 2500; // lasts for 2.5 seconds
+        this.life = this.lifeMax;
+        this.lastSlashTime = 0;
+        this.radius = 20;
+        this.driftAngle = Math.random() * Math.PI * 2;
+    }
+
+    update(enemies, deltaTime, gameEngine) {
+        this.life -= deltaTime;
+        if (this.life <= 0) return true; // to be spliced
+
+        // Find nearest enemy to drift towards and slash
+        let closest = null;
+        let minDist = 300;
+        enemies.forEach(enemy => {
+            if (enemy.hp > 0 && enemy.type !== 'mine' && enemy.type !== 'portal') {
+                const dist = Vector.dist(this.x, this.y, enemy.x, enemy.y);
+                if (dist < minDist) {
+                    minDist = dist;
+                    closest = enemy;
+                }
+            }
+        });
+
+        if (closest) {
+            // Drift towards enemy
+            const angle = Vector.angle(this.x, this.y, closest.x, closest.y);
+            this.driftAngle = angle;
+            this.x += Math.cos(angle) * 3 * (deltaTime / 16.67);
+            this.y += Math.sin(angle) * 3 * (deltaTime / 16.67);
+
+            // Slash every 300ms
+            const now = performance.now();
+            if (now - this.lastSlashTime >= 300) {
+                this.lastSlashTime = now;
+                // Trigger a sword slash at closest enemy angle
+                gameEngine.triggerCloneSwordSlash(this.x, this.y, angle, this.damage);
+            }
+        } else {
+            // Drift in a random direction if no enemies
+            this.x += Math.cos(this.driftAngle) * 1 * (deltaTime / 16.67);
+            this.y += Math.sin(this.driftAngle) * 1 * (deltaTime / 16.67);
+        }
+
+        return false;
+    }
+
+    draw(ctx, camera) {
+        // Draw translucent pink ship
+        const sX = this.x - camera.x;
+        const sY = this.y - camera.y;
+        
+        ctx.save();
+        ctx.translate(sX, sY);
+        ctx.rotate(this.driftAngle);
+        
+        const alpha = Math.max(0.1, this.life / this.lifeMax) * 0.55;
+        ctx.fillStyle = `rgba(255, 0, 127, ${alpha * 0.4})`;
+        ctx.strokeStyle = `rgba(255, 0, 127, ${alpha})`;
+        ctx.lineWidth = 2;
+        
+        // Triangle ship shape
+        ctx.beginPath();
+        ctx.moveTo(15, 0);
+        ctx.lineTo(-12, -10);
+        ctx.lineTo(-6, 0);
+        ctx.lineTo(-12, 10);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        
+        ctx.restore();
+    }
+}
 
 // --- 4. GAME ENGINE CLASS ---
 class Game {
@@ -33,6 +113,11 @@ class Game {
         this.swordSlashes = [];
         this.hammerWaves = [];
         this.lightningBolts = [];
+        this.singularities = [];
+        this.shadowClones = [];
+        this.merchantSpawnTimer = 0;
+        this.merchantActive = false;
+        this.merchantPortal = null;
         
         // Hệ thống điều khiển Boss định kỳ
         this.bossSpawnInterval = 60; // Xuất hiện Boss mỗi 60 giây
@@ -113,6 +198,11 @@ class Game {
             bossHpText: document.getElementById('boss-hp-text'),
             bossWarning: document.getElementById('boss-warning-overlay'),
             bossCountdown: document.getElementById('boss-warning-countdown'),
+            overclockFill: document.getElementById('hud-overclock-fill'),
+            overclockText: document.getElementById('hud-overclock-text'),
+            overclockPrompt: document.getElementById('overclock-prompt'),
+            hackedShop: document.getElementById('hacked-shop-menu'),
+            hackedShopChoices: document.getElementById('hacked-shop-choices'),
         };
     }
 
@@ -286,6 +376,15 @@ class Game {
                 this.backToMainMenu();
             });
         }
+
+        // Nút đóng Chợ Đen
+        const closeShopBtn = document.getElementById('btn-close-shop');
+        if (closeShopBtn) {
+            closeShopBtn.addEventListener('click', () => {
+                sounds.playMenuSelect();
+                this.closeHackedShop();
+            });
+        }
     }
 
     loadHighScores() {
@@ -376,6 +475,23 @@ class Game {
 
         sounds.playExplosion();
         this.kills++;
+
+        // Thu hoạch quái đặc biệt Glitch Gold Bug
+        if (enemy.type === 'gold_bug') {
+            for (let i = 0; i < 7; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const dist = Math.random() * 40;
+                this.items.push(new Item(enemy.x + Math.cos(angle) * dist, enemy.y + Math.sin(angle) * dist, 'xp', 5));
+            }
+            this.items.push(new Item(enemy.x, enemy.y + 15, 'double'));
+            this.floatingTexts.push(new FloatingText(enemy.x, enemy.y - 30, 'GLITCH HARVESTED! 💰', '#fffb00', 16));
+        }
+
+        // Tích lũy năng lượng Overclock
+        if (this.player && !this.player.overclockActive) {
+            this.player.overclockEnergy = Math.min(100, (this.player.overclockEnergy || 0) + 2.5);
+        }
+
         this.spawnBloodParticles(enemy.x, enemy.y, enemy.color, 12);
         this.triggerScreenShake(4, 100);
 
@@ -535,6 +651,11 @@ class Game {
         this.hammerWaves = [];
         this.activeShockwaves = [];
         this.lightningBolts = [];
+        this.singularities = [];
+        this.shadowClones = [];
+        this.merchantSpawnTimer = 0;
+        this.merchantActive = false;
+        this.merchantPortal = null;
 
         // Reset trạng thái Boss định kỳ
         this.nextBossTime = 60;
@@ -821,7 +942,8 @@ class Game {
             
             const types = [
                 'earthquake', 'fire_vent', 'meteor_storm',
-                'portal_overload', 'frequency_glitch', 'zero_gravity'
+                'portal_overload', 'frequency_glitch', 'zero_gravity',
+                'matrix_protocol'
             ];
             this.disasterType = types[Math.floor(Math.random() * types.length)];
             this.nextDisasterTime += this.disasterInterval;
@@ -835,7 +957,8 @@ class Game {
                 'meteor_storm': 'MƯA ĐÁ CYBER / METEOR STORM!',
                 'portal_overload': 'CỔNG DỮ LIỆU QUÁ TẢI / PORTAL OVERLOAD!',
                 'frequency_glitch': 'LỖI TẦN SỐ HỆ THỐNG / FREQUENCY GLITCH!',
-                'zero_gravity': 'TRẠNG THÁI PHI TRỌNG LỰC / ZERO GRAVITY!'
+                'zero_gravity': 'TRẠNG THÁI PHI TRỌNG LỰC / ZERO GRAVITY!',
+                'matrix_protocol': 'GIAO THỨC MATRIX / MATRIX PROTOCOL DETECTED!'
             };
             const disasterColors = {
                 'earthquake': '#39ff14',
@@ -843,7 +966,8 @@ class Game {
                 'meteor_storm': '#ff3131',
                 'portal_overload': '#ff00ff',
                 'frequency_glitch': '#00f0ff',
-                'zero_gravity': '#b026ff'
+                'zero_gravity': '#b026ff',
+                'matrix_protocol': '#39ff14'
             };
             this.floatingTexts.push(new FloatingText(this.player.x, this.player.y - 60, disasterNames[this.disasterType], disasterColors[this.disasterType], 22));
 
@@ -863,6 +987,13 @@ class Game {
                     this.enemies.push(portal);
                     this.spawnBloodParticles(px, py, '#ff00ff', 12);
                 }
+            } else if (this.disasterType === 'matrix_protocol') {
+                // Sinh ngẫu nhiên quái Glitch Gold Bug gần phi thuyền
+                const angle = Math.random() * Math.PI * 2;
+                const bx = this.player.x + Math.cos(angle) * 350;
+                const by = this.player.y + Math.sin(angle) * 350;
+                const goldBug = new Enemy(bx, by, this.player.level, 'gold_bug');
+                this.enemies.push(goldBug);
             } else if (this.disasterType === 'frequency_glitch') {
                 // Áp dụng CSS class glitch
                 const container = document.getElementById('game-container');
@@ -1005,6 +1136,17 @@ class Game {
                 }
                 // Spawn rương Siêu cấp tại vị trí chết của Boss
                 this.items.push(new Item(this.bossDeathX, this.bossDeathY, 'chest'));
+                
+                // Spawn Cổng Chợ Đen khi diệt Boss
+                this.merchantActive = true;
+                this.merchantPortal = {
+                    x: this.bossDeathX,
+                    y: this.bossDeathY,
+                    radius: 40,
+                    pulseTimer: 0,
+                    life: 15000 // 15 giây
+                };
+                this.floatingTexts.push(new FloatingText(this.bossDeathX, this.bossDeathY - 40, 'CỔNG CHỢ ĐEN XUẤT HIỆN! 📡', '#ff3131', 20));
             }
         }
         
@@ -1040,6 +1182,11 @@ class Game {
         if (this.keys['e']) {
             this.keys['e'] = false;
             this.triggerShockwave();
+        }
+        if (this.keys['q'] || this.keys['f']) {
+            this.keys['q'] = false;
+            this.keys['f'] = false;
+            this.triggerOverclock();
         }
 
         // Cập nhật Sóng Chấn Động nếu có hoạt động
@@ -1189,15 +1336,71 @@ class Game {
 
         // 2. Tấn công chủ động khi đè chuột trái
         if (this.mouse.isDown) {
-            if (now - this.player.lastShotTime >= modifiedFireRate) {
-                this.player.lastShotTime = now;
-                
-                if (this.player.role === 'assassin') {
-                    this.triggerSwordSlash(this.player.angle);
-                } else if (this.player.role === 'fighter') {
-                    this.triggerHammerSmash(this.player.angle);
-                } else {
-                    this.shootBullet();
+            if (this.player.role === 'ranger' && this.player.overclockActive) {
+                // Ranger Overclock: Mega Beam laser sweep
+                if (!this.lastRangerLaserTickTime) this.lastRangerLaserTickTime = 0;
+                const laserNow = performance.now();
+                if (laserNow - this.lastRangerLaserTickTime >= 60) {
+                    this.lastRangerLaserTickTime = laserNow;
+                    
+                    const angle = this.player.angle;
+                    const maxLen = 700;
+                    const laserDamage = Math.max(1, Math.floor(this.player.damage * 0.35 * (1 + this.player.upgrades.damage * 0.25)));
+                    
+                    // Line-circle intersection with enemies
+                    this.enemies.forEach((enemy, idx) => {
+                        if (enemy.hp > 0 && enemy.type !== 'portal') {
+                            const ex = enemy.x - this.player.x;
+                            const ey = enemy.y - this.player.y;
+                            
+                            const cosA = Math.cos(angle);
+                            const sinA = Math.sin(angle);
+                            const proj = ex * cosA + ey * sinA;
+                            
+                            if (proj > 0 && proj < maxLen) {
+                                const perpDist = Math.abs(-ex * sinA + ey * cosA);
+                                const allowedDist = enemy.radius + 15;
+                                if (perpDist < allowedDist) {
+                                    const vx = cosA * 2;
+                                    const vy = sinA * 2;
+                                    this.damageEnemy(enemy, laserDamage, vx, vy, idx);
+                                    
+                                    const hitX = this.player.x + cosA * proj;
+                                    const hitY = this.player.y + sinA * proj;
+                                    this.spawnBloodParticles(hitX, hitY, '#00f0ff', 2);
+                                }
+                            }
+                        }
+                    });
+                    
+                    // Intersect with barrels
+                    for (let j = this.barrels.length - 1; j >= 0; j--) {
+                        const b = this.barrels[j];
+                        const ex = b.x - this.player.x;
+                        const ey = b.y - this.player.y;
+                        const proj = ex * Math.cos(angle) + ey * Math.sin(angle);
+                        
+                        if (proj > 0 && proj < maxLen) {
+                            const perpDist = Math.abs(-ex * Math.sin(angle) + ey * Math.cos(angle));
+                            const allowedDist = b.radius + 15;
+                            if (perpDist < allowedDist) {
+                                this.triggerBarrelExplosion(b.x, b.y, 'ranger_overload');
+                                this.barrels.splice(j, 1);
+                            }
+                        }
+                    }
+                }
+            } else {
+                if (now - this.player.lastShotTime >= modifiedFireRate) {
+                    this.player.lastShotTime = now;
+                    
+                    if (this.player.role === 'assassin') {
+                        this.triggerSwordSlash(this.player.angle);
+                    } else if (this.player.role === 'fighter') {
+                        this.triggerHammerSmash(this.player.angle);
+                    } else {
+                        this.shootBullet();
+                    }
                 }
             }
         }
@@ -1281,6 +1484,94 @@ class Game {
                 this.floatingTexts.splice(i, 1);
             }
         }
+        
+        // Cập nhật Hố đen ma pháp (Gravity Singularities)
+        for (let i = this.singularities.length - 1; i >= 0; i--) {
+            const singularity = this.singularities[i];
+            const isDead = singularity.update(this.enemies, deltaTime, this);
+            if (isDead) {
+                this.singularities.splice(i, 1);
+            }
+        }
+
+        // Cập nhật Phân Thân Bóng Tối (Shadow Clones)
+        for (let i = this.shadowClones.length - 1; i >= 0; i--) {
+            const clone = this.shadowClones[i];
+            const isDead = clone.update(this.enemies, deltaTime, this);
+            if (isDead) {
+                this.shadowClones.splice(i, 1);
+            }
+        }
+
+        // Spawn shadow clones liên tục mỗi 800ms khi Assassin bật Overclock
+        if (this.player.role === 'assassin' && this.player.overclockActive) {
+            const now = performance.now();
+            if (!this.lastShadowCloneSpawnTime) this.lastShadowCloneSpawnTime = 0;
+            if (now - this.lastShadowCloneSpawnTime >= 800) {
+                this.lastShadowCloneSpawnTime = now;
+                const angle = Math.random() * Math.PI * 2;
+                const dist = 50 + Math.random() * 80;
+                const cloneX = this.player.x + Math.cos(angle) * dist;
+                const cloneY = this.player.y + Math.sin(angle) * dist;
+                const cloneDamage = Math.floor(this.player.damage * 0.8 * (1 + this.player.upgrades.damage * 0.25));
+                this.shadowClones.push(new ShadowClone(cloneX, cloneY, cloneDamage));
+            }
+        }
+
+        // Cập nhật Cổng Chợ Đen (Merchant Portal)
+        if (this.state === 'PLAYING') {
+            this.merchantSpawnTimer += deltaTime;
+            if (this.merchantSpawnTimer >= 90000) { // 90 giây
+                this.merchantSpawnTimer = 0;
+                this.merchantActive = true;
+                
+                const angle = Math.random() * Math.PI * 2;
+                const portalX = Math.max(100, Math.min(this.worldSize - 100, this.player.x + Math.cos(angle) * 200));
+                const portalY = Math.max(100, Math.min(this.worldSize - 100, this.player.y + Math.sin(angle) * 200));
+                
+                this.merchantPortal = {
+                    x: portalX,
+                    y: portalY,
+                    radius: 40,
+                    pulseTimer: 0,
+                    life: 15000 // 15 giây
+                };
+                
+                sounds.playLevelUp();
+                this.floatingTexts.push(new FloatingText(portalX, portalY - 40, 'CỔNG CHỢ ĐEN XUẤT HIỆN! 📡', '#ff3131', 20));
+            }
+        }
+
+        if (this.merchantActive && this.merchantPortal) {
+            this.merchantPortal.life -= deltaTime;
+            this.merchantPortal.pulseTimer += deltaTime;
+            if (this.merchantPortal.life <= 0) {
+                this.merchantActive = false;
+                this.merchantPortal = null;
+                this.floatingTexts.push(new FloatingText(this.player.x, this.player.y - 40, 'CỔNG CHỢ ĐEN ĐÃ ĐÓNG!', '#888888', 16));
+            } else {
+                const dist = Vector.dist(this.player.x, this.player.y, this.merchantPortal.x, this.merchantPortal.y);
+                if (dist < this.player.radius + this.merchantPortal.radius) {
+                    this.merchantActive = false;
+                    this.merchantPortal = null;
+                    this.triggerHackedShop();
+                }
+            }
+        }
+
+        // Xử lý mất HP từ Ép Xung Quá Nhiệt (Overheated)
+        if (this.player.upgrades.overheated > 0 && this.state === 'PLAYING') {
+            if (!this.lastOverheatedDamageTime) this.lastOverheatedDamageTime = 0;
+            const now = performance.now();
+            if (now - this.lastOverheatedDamageTime >= 1200) {
+                this.lastOverheatedDamageTime = now;
+                if (this.player.hp > 1) {
+                    this.player.hp = Math.max(1, this.player.hp - 1);
+                    this.floatingTexts.push(new FloatingText(this.player.x, this.player.y - 30, '-1 HP 🔥', '#ff5500', 12));
+                    this.spawnBloodParticles(this.player.x, this.player.y, '#ff5500', 3);
+                }
+            }
+        }
 
         // Cập nhật Vật phẩm (Items)
         const isMagnetActive = (this.magnetPowerupTimer > 0);
@@ -1311,19 +1602,26 @@ class Game {
             
             // Hủy đạn khi hết thời gian bay
             if (bullet.life <= 0) {
+                if (bullet.isSingularity) {
+                    this.singularities.push(new GravitySingularity(bullet.x, bullet.y, bullet.damage));
+                }
                 this.bullets.splice(i, 1);
                 continue;
             }
 
             // Hủy đạn khi vượt quá biên thế giới
             if (bullet.x < 0 || bullet.x > this.worldSize || bullet.y < 0 || bullet.y > this.worldSize) {
+                if (bullet.isSingularity) {
+                    this.singularities.push(new GravitySingularity(bullet.x, bullet.y, bullet.damage));
+                }
                 this.bullets.splice(i, 1);
                 continue;
             }
 
             // Kiểm tra va chạm với Cột Năng lượng
             let bulletCollided = false;
-            for (let p of this.pillars) {
+            for (let k = this.pillars.length - 1; k >= 0; k--) {
+                const p = this.pillars[k];
                 if (Vector.dist(bullet.x, bullet.y, p.x, p.y) < bullet.radius + p.radius) {
                     bulletCollided = true;
                     this.bullets.splice(i, 1);
@@ -1331,13 +1629,25 @@ class Game {
                     
                     // Nổ ma pháp nếu là đạn Mage
                     if (bullet.isOrb && bullet.isPlayerBullet) {
-                        this.triggerMagicExplosion(bullet.x, bullet.y, bullet.damage);
+                        if (bullet.isSingularity) {
+                            this.singularities.push(new GravitySingularity(bullet.x, bullet.y, bullet.damage));
+                        } else {
+                            this.triggerMagicExplosion(bullet.x, bullet.y, bullet.damage);
+                        }
+                    }
+
+                    // Gây sát thương lên Cột Khúc Xạ
+                    if (bullet.isPlayerBullet) {
+                        p.hp -= bullet.damage;
+                        if (p.hp <= 0) {
+                            this.triggerPillarExplosion(p, k);
+                        }
                     }
                     
                     // Cơ chế khúc xạ (Refractive energy splitting)
                     const isLaser = (bullet.color === '#00f0ff' || bullet.color === '#39ff14' || bullet.color === '#ff00ff' || bullet.color === '#ff3131');
                     const currentSplit = bullet.splitCount || 0;
-                    if (isLaser && currentSplit < 2) {
+                    if (isLaser && currentSplit < 2 && p.hp > 0) {
                         const incomingAngle = Math.atan2(bullet.vy, bullet.vx);
                         const speed = Math.sqrt(bullet.vx * bullet.vx + bullet.vy * bullet.vy);
                         
@@ -1381,7 +1691,11 @@ class Game {
                     
                     // Nổ ma pháp nếu là đạn Mage
                     if (bullet.isOrb && bullet.isPlayerBullet) {
-                        this.triggerMagicExplosion(bullet.x, bullet.y, bullet.damage);
+                        if (bullet.isSingularity) {
+                            this.singularities.push(new GravitySingularity(bullet.x, bullet.y, bullet.damage));
+                        } else {
+                            this.triggerMagicExplosion(bullet.x, bullet.y, bullet.damage);
+                        }
                     }
                     
                     b.hp--;
@@ -1482,9 +1796,9 @@ class Game {
             // Gây sát thương quái trong phạm vi chém (quét ngược tránh lỗi index khi splice)
             for (let j = this.enemies.length - 1; j >= 0; j--) {
                 const enemy = this.enemies[j];
-                const dist = Vector.dist(this.player.x, this.player.y, enemy.x, enemy.y);
+                const dist = Vector.dist(slash.x, slash.y, enemy.x, enemy.y);
                 if (dist < slash.radius + enemy.radius) {
-                    const angleToEnemy = Math.atan2(enemy.y - this.player.y, enemy.x - this.player.x);
+                    const angleToEnemy = Math.atan2(enemy.y - slash.y, enemy.x - slash.x);
                     let diff = Math.abs(angleToEnemy - slash.angle);
                     if (diff > Math.PI) diff = Math.PI * 2 - diff;
                     
@@ -1499,12 +1813,35 @@ class Game {
                 }
             }
 
+            // Kiểm tra va chạm Cột Năng lượng trong nhát chém
+            for (let k = this.pillars.length - 1; k >= 0; k--) {
+                const p = this.pillars[k];
+                const dist = Vector.dist(slash.x, slash.y, p.x, p.y);
+                if (dist < slash.radius + p.radius) {
+                    const angleToPillar = Math.atan2(p.y - slash.y, p.x - slash.x);
+                    let diff = Math.abs(angleToPillar - slash.angle);
+                    if (diff > Math.PI) diff = Math.PI * 2 - diff;
+                    
+                    if (diff < Math.PI / 3) {
+                        if (!slash.hitPillars) slash.hitPillars = new Set();
+                        if (!slash.hitPillars.has(p)) {
+                            slash.hitPillars.add(p);
+                            p.hp -= slash.damage;
+                            this.spawnBloodParticles(p.x, p.y, p.neonColor, 4);
+                            if (p.hp <= 0) {
+                                this.triggerPillarExplosion(p, k);
+                            }
+                        }
+                    }
+                }
+            }
+
             // Kiểm tra va chạm Thùng thuốc nổ trong nhát chém
             for (let j = this.barrels.length - 1; j >= 0; j--) {
                 const b = this.barrels[j];
-                const dist = Vector.dist(this.player.x, this.player.y, b.x, b.y);
+                const dist = Vector.dist(slash.x, slash.y, b.x, b.y);
                 if (dist < slash.radius + b.radius) {
-                    const angleToBarrel = Math.atan2(b.y - this.player.y, b.x - this.player.x);
+                    const angleToBarrel = Math.atan2(b.y - slash.y, b.x - slash.x);
                     let diff = Math.abs(angleToBarrel - slash.angle);
                     if (diff > Math.PI) diff = Math.PI * 2 - diff;
 
@@ -1519,9 +1856,9 @@ class Game {
             for (let j = this.bullets.length - 1; j >= 0; j--) {
                 const bullet = this.bullets[j];
                 if (!bullet.isPlayerBullet) {
-                    const dist = Vector.dist(this.player.x, this.player.y, bullet.x, bullet.y);
+                    const dist = Vector.dist(slash.x, slash.y, bullet.x, bullet.y);
                     if (dist < slash.radius + bullet.radius) {
-                        const angleToBullet = Math.atan2(bullet.y - this.player.y, bullet.x - this.player.x);
+                        const angleToBullet = Math.atan2(bullet.y - slash.y, bullet.x - slash.x);
                         let diff = Math.abs(angleToBullet - slash.angle);
                         if (diff > Math.PI) diff = Math.PI * 2 - diff;
                         
@@ -1561,6 +1898,29 @@ class Game {
                             const vx = Math.cos(forceAngle) * 15;
                             const vy = Math.sin(forceAngle) * 15;
                             this.damageEnemy(enemy, wave.damage, vx, vy, j, { isHeavy: true });
+                        }
+                    }
+                }
+            }
+
+            // Kiểm tra va chạm Cột Năng lượng trong sóng búa
+            for (let k = this.pillars.length - 1; k >= 0; k--) {
+                const p = this.pillars[k];
+                const dist = Vector.dist(this.player.x, this.player.y, p.x, p.y);
+                if (dist < wave.radius + p.radius && dist > wave.radius - 50 - p.radius) {
+                    const angleToPillar = Math.atan2(p.y - this.player.y, p.x - this.player.x);
+                    let diff = Math.abs(angleToPillar - wave.angle);
+                    if (diff > Math.PI) diff = Math.PI * 2 - diff;
+                    
+                    if (wave.is360 || diff < Math.PI / 4) {
+                        if (!wave.hitPillars) wave.hitPillars = new Set();
+                        if (!wave.hitPillars.has(p)) {
+                            wave.hitPillars.add(p);
+                            p.hp -= wave.damage;
+                            this.spawnBloodParticles(p.x, p.y, p.neonColor, 4);
+                            if (p.hp <= 0) {
+                                this.triggerPillarExplosion(p, k);
+                            }
                         }
                     }
                 }
@@ -1620,16 +1980,22 @@ class Game {
                     continue;
                 }
                 
-                const damaged = this.player.takeDamage(enemy.damage);
-                if (damaged) {
-                    this.triggerScreenShake(12, 250);
-                    this.floatingTexts.push(new FloatingText(this.player.x, this.player.y - 20, `-${enemy.damage}`, '#ff3131', 18));
-                    this.spawnBloodParticles(this.player.x, this.player.y, '#ff3131');
+                if (enemy.isHacked) {
+                    // Quái vật bị hack không gây sát thương cho người chơi, chỉ đẩy nhẹ ra
+                    const pushAngle = Vector.angle(this.player.x, this.player.y, enemy.x, enemy.y);
+                    enemy.applyKnockback(pushAngle, 4);
+                } else {
+                    const damaged = this.player.takeDamage(enemy.damage);
+                    if (damaged) {
+                        this.triggerScreenShake(12, 250);
+                        this.floatingTexts.push(new FloatingText(this.player.x, this.player.y - 20, `-${enemy.damage}`, '#ff3131', 18));
+                        this.spawnBloodParticles(this.player.x, this.player.y, '#ff3131');
+                    }
+                    
+                    // Đẩy nhẹ quái vật ra khi va chạm với người chơi để tránh kẹt dính
+                    const pushAngle = Vector.angle(this.player.x, this.player.y, enemy.x, enemy.y);
+                    enemy.applyKnockback(pushAngle, 8);
                 }
-                
-                // Đẩy nhẹ quái vật ra khi va chạm với người chơi để tránh kẹt dính
-                const pushAngle = Vector.angle(this.player.x, this.player.y, enemy.x, enemy.y);
-                enemy.applyKnockback(pushAngle, 8);
             }
 
             // Va chạm đẩy nhau giữa quái vật (Crowd Separation)
@@ -1648,6 +2014,35 @@ class Game {
                     enemy.y += Math.sin(angle) * overlap * 0.5;
                     other.x -= Math.cos(angle) * overlap * 0.5;
                     other.y -= Math.sin(angle) * overlap * 0.5;
+
+                    // Hacked enemy vs Non-hacked enemy combat
+                    if ((enemy.isHacked && !other.isHacked) || (!enemy.isHacked && other.isHacked)) {
+                        const hackedObj = enemy.isHacked ? enemy : other;
+                        const targetObj = enemy.isHacked ? other : enemy;
+
+                        if (!hackedObj.lastHackedHitTime) hackedObj.lastHackedHitTime = 0;
+                        const now = performance.now();
+                        if (now - hackedObj.lastHackedHitTime >= 1000) {
+                            hackedObj.lastHackedHitTime = now;
+                            
+                            // Hacked deals contact damage to target
+                            const dmg = Math.floor(hackedObj.damage * 1.5);
+                            targetObj.hp -= dmg;
+                            this.spawnBloodParticles(targetObj.x, targetObj.y, targetObj.color, 4);
+                            this.floatingTexts.push(new FloatingText(targetObj.x, targetObj.y - targetObj.radius, `${dmg}`, '#ff00ff', 14));
+                            sounds.playHit();
+
+                            // Target also deals damage back to hacked enemy
+                            hackedObj.hp -= Math.floor(targetObj.damage * 0.5);
+                            this.spawnBloodParticles(hackedObj.x, hackedObj.y, hackedObj.color, 2);
+
+                            // If the current enemy dies, kill it immediately and break
+                            if (enemy.hp <= 0) {
+                                this.onEnemyKilled(enemy, i);
+                                break;
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -1656,7 +2051,10 @@ class Game {
         const hasBoss = this.enemies.some(e => e instanceof Boss);
         if (!this.bossWarningActive && !hasBoss && this.bossDeathTimer <= 0) {
             this.spawnTimer += deltaTime;
-            const adjustedInterval = Math.max(400, this.spawnInterval - Math.floor(this.gameTime / 15) * 80);
+            let adjustedInterval = Math.max(400, this.spawnInterval - Math.floor(this.gameTime / 15) * 80);
+            if (this.disasterActive && this.disasterType === 'matrix_protocol') {
+                adjustedInterval /= 2.2;
+            }
             
             if (this.spawnTimer >= adjustedInterval) {
                 this.spawnTimer = 0;
@@ -1825,6 +2223,12 @@ class Game {
                     const angle = Vector.angle(this.player.droneX, this.player.droneY, nearest.x, nearest.y);
                     const vx = Math.cos(angle) * 11;
                     const vy = Math.sin(angle) * 11;
+                    
+                    let laserColor = '#39ff14';
+                    if (this.player.subWeapons.laserDrone === 2) laserColor = '#00f0ff';
+                    else if (this.player.subWeapons.laserDrone === 3) laserColor = '#ff00ff';
+                    else if (this.player.subWeapons.laserDrone >= 4) laserColor = '#fffb00';
+                    
                     this.bullets.push(new Bullet(
                         this.player.droneX,
                         this.player.droneY,
@@ -1832,11 +2236,93 @@ class Game {
                         vy,
                         6,
                         10 + this.player.subWeapons.laserDrone * 5,
-                        '#39ff14', // Neon Green laser
+                        laserColor,
                         true
                     ));
                     sounds.playShoot();
                 }
+            }
+
+            // --- TÍNH NĂNG DRONE CHIẾN THUẬT INTERACTIVE ---
+            
+            // Cấp 2+: Shield Drone - Tạo lá chắn trước đầu phi thuyền chắn đạn
+            if (this.player.subWeapons.laserDrone >= 2) {
+                const shieldX = this.player.x + Math.cos(this.player.angle) * 50;
+                const shieldY = this.player.y + Math.sin(this.player.angle) * 50;
+                for (let j = this.bullets.length - 1; j >= 0; j--) {
+                    const bullet = this.bullets[j];
+                    if (!bullet.isPlayerBullet) {
+                        const d = Vector.dist(bullet.x, bullet.y, shieldX, shieldY);
+                        if (d < bullet.radius + 18) {
+                            const angleToBullet = Math.atan2(bullet.y - this.player.y, bullet.x - this.player.x);
+                            let diff = Math.abs(angleToBullet - this.player.angle);
+                            if (diff > Math.PI) diff = Math.PI * 2 - diff;
+                            if (diff < Math.PI / 3) {
+                                this.bullets.splice(j, 1);
+                                sounds.playHit();
+                                this.spawnBloodParticles(bullet.x, bullet.y, '#00f0ff', 3);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Cấp 3+: Hacking Drone - Tự động hack virus lớn thành đồng minh trong 6 giây
+            if (this.player.subWeapons.laserDrone >= 3) {
+                if (!this.lastHackTime) this.lastHackTime = 0;
+                const hackNow = performance.now();
+                if (hackNow - this.lastHackTime >= 6000) {
+                    let candidates = this.enemies.filter(e => e.hp > 0 && !e.isHacked && e.type !== 'mine' && e.type !== 'portal' && !(e instanceof Boss));
+                    if (candidates.length > 0) {
+                        candidates.sort((a, b) => {
+                            return Vector.dist(this.player.x, this.player.y, a.x, a.y) - Vector.dist(this.player.x, this.player.y, b.x, b.y);
+                        });
+                        
+                        const targetEnemy = candidates[0];
+                        if (Vector.dist(this.player.x, this.player.y, targetEnemy.x, targetEnemy.y) < 350) {
+                            this.lastHackTime = hackNow;
+                            targetEnemy.isHacked = true;
+                            targetEnemy.hackTimer = 6000;
+                            targetEnemy.color = '#ff00ff';
+                            
+                            sounds.playPowerup();
+                            this.floatingTexts.push(new FloatingText(targetEnemy.x, targetEnemy.y - targetEnemy.radius - 10, 'HACKED! 📡', '#ff00ff', 14));
+                            this.spawnBloodParticles(targetEnemy.x, targetEnemy.y, '#ff00ff', 6);
+                            
+                            this.activeHackBeam = {
+                                startX: this.player.droneX,
+                                startY: this.player.droneY,
+                                endX: targetEnemy.x,
+                                endY: targetEnemy.y,
+                                life: 200
+                            };
+                        }
+                    }
+                }
+            }
+
+            // Cấp 4+: Nano-Repair Drone - Hồi phục khẩn cấp khi máu thấp dưới 35%
+            if (this.player.subWeapons.laserDrone >= 4 && (this.player.hp / this.player.maxHp) <= 0.35) {
+                if (!this.lastRepairTime) this.lastRepairTime = 0;
+                const repairNow = performance.now();
+                if (repairNow - this.lastRepairTime >= 10000) {
+                    this.lastRepairTime = repairNow;
+                    
+                    const healAmt = Math.floor(this.player.maxHp * 0.1);
+                    this.player.hp = Math.min(this.player.maxHp, this.player.hp + healAmt);
+                    
+                    sounds.playPowerup();
+                    this.floatingTexts.push(new FloatingText(this.player.x, this.player.y - 30, `+${healAmt} HP (NANO REPAIR) 🧪`, '#39ff14', 16));
+                    this.blastRings.push(new BlastRing(this.player.x, this.player.y, 80, '#39ff14'));
+                    this.spawnBloodParticles(this.player.x, this.player.y, '#39ff14', 8);
+                }
+            }
+        }
+
+        if (this.activeHackBeam) {
+            this.activeHackBeam.life -= deltaTime;
+            if (this.activeHackBeam.life <= 0) {
+                this.activeHackBeam = null;
             }
         }
 
@@ -2253,6 +2739,20 @@ class Game {
         const role = this.player.role || 'fighter';
         const angle = this.player.angle;
 
+        if (role === 'mage' && this.player.overclockActive) {
+            const speed = 6.5;
+            const radius = 15;
+            const color = '#b026ff';
+            const vx = Math.cos(angle) * speed;
+            const vy = Math.sin(angle) * speed;
+            
+            const b = new Bullet(this.player.x, this.player.y, vx, vy, radius, damage, color);
+            b.isSingularity = true;
+            b.isOrb = true;
+            this.bullets.push(b);
+            return;
+        }
+
         if (role === 'ranger') {
             // Ranger: Cyan laser array (3 or 5 parallel lasers)
             const speed = 11;
@@ -2384,6 +2884,22 @@ class Game {
         }
     }
 
+    triggerCloneSwordSlash(x, y, angle, damage) {
+        sounds.playSwordSlash();
+        const range = 90;
+        const color = '#ff007f';
+        this.swordSlashes.push(new SwordSlash(x, y, angle, range, color, damage));
+        
+        // Sinh hạt bụi kiếm
+        for (let i = 0; i < 4; i++) {
+            const spreadAngle = angle + (Math.random() - 0.5) * 1.2;
+            const dist = 20 + Math.random() * 40;
+            const px = x + Math.cos(spreadAngle) * dist;
+            const py = y + Math.sin(spreadAngle) * dist;
+            this.particles.push(new Particle(px, py, '#ff007f'));
+        }
+    }
+
     triggerHammerSmash(angle) {
         sounds.playHammerSmash();
         let damage = Math.floor(this.player.damage * 1.8 * (1 + this.player.upgrades.damage * 0.30));
@@ -2416,6 +2932,36 @@ class Game {
             const px = this.player.x + Math.cos(spreadAngle) * dist;
             const py = this.player.y + Math.sin(spreadAngle) * dist;
             this.particles.push(new Particle(px, py, '#fffb00'));
+        }
+
+        // Fighter Overclock: Chain Lightning
+        if (this.player.overclockActive) {
+            let currentSource = this.player;
+            let targets = this.enemies.filter(e => e.hp > 0 && e.type !== 'mine' && e.type !== 'portal' && Vector.dist(this.player.x, this.player.y, e.x, e.y) < 500);
+            let chainCount = 0;
+            const chainDamage = Math.floor(damage * 1.5);
+            const visited = new Set();
+            
+            while (chainCount < 5 && targets.length > 0) {
+                let closest = null;
+                let closestDist = Infinity;
+                for (let t of targets) {
+                    if (visited.has(t)) continue;
+                    const d = Vector.dist(currentSource.x, currentSource.y, t.x, t.y);
+                    if (d < closestDist) {
+                        closestDist = d;
+                        closest = t;
+                    }
+                }
+                if (!closest) break;
+                
+                visited.add(closest);
+                this.lightningBolts.push(new LightningBolt(currentSource.x, currentSource.y, closest.x, closest.y, '#fffb00'));
+                this.damageEnemy(closest, chainDamage, 0, 0, this.enemies.indexOf(closest));
+                
+                currentSource = closest;
+                chainCount++;
+            }
         }
     }
 
@@ -2454,15 +3000,27 @@ class Game {
         // Hiển thị số sát thương bay lên (Chí mạng màu cầu vồng lớn nhấp nháy màn hình)
         if (isCrit) {
             this.triggerScreenShake(3, 100);
-            this.floatingTexts.push(new FloatingText(enemy.x, enemy.y - enemy.radius, `${finalDamage}! CRIT`, '#ff007f', 24, true));
+            this.floatingTexts.push(new FloatingText(enemy.x, enemy.y - enemy.radius, `${finalDamage}! CRIT`, '#ff007f', 32, true));
             this.whiteFlashTimer = 50; // 50ms nháy màn hình trắng
+
+            // Burst of 15 rainbow-colored particles
+            const available = Math.max(0, 300 - this.particles.length);
+            const actualCount = Math.min(15, available);
+            for (let i = 0; i < actualCount; i++) {
+                const randColor = `hsl(${Math.random() * 360}, 100%, 65%)`;
+                this.particles.push(new Particle(enemy.x, enemy.y, randColor));
+            }
         } else {
             this.floatingTexts.push(new FloatingText(enemy.x, enemy.y - enemy.radius, `${finalDamage}`, '#00f0ff', 15));
         }
 
         // Xử lý nổ ma pháp của Pháp sư
         if (bulletRef && bulletRef.isOrb) {
-            this.triggerMagicExplosion(bulletRef.x, bulletRef.y, finalDamage);
+            if (bulletRef.isSingularity) {
+                this.singularities.push(new GravitySingularity(bulletRef.x, bulletRef.y, finalDamage));
+            } else {
+                this.triggerMagicExplosion(bulletRef.x, bulletRef.y, finalDamage);
+            }
         }
 
         // Kiểm tra xem quái vật chết chưa
@@ -2524,6 +3082,38 @@ class Game {
         }
     }
 
+    triggerPillarExplosion(p, pIdx) {
+        sounds.playExplosion();
+        this.triggerScreenShake(20, 300);
+        const empRadius = 220;
+        this.blastRings.push(new BlastRing(p.x, p.y, empRadius, '#00f0ff'));
+        this.addGridDistortion(p.x, p.y, empRadius * 1.2, 40, 450);
+        
+        this.enemies.forEach((enemy, idx) => {
+            if (enemy.hp > 0 && enemy.type !== 'portal') {
+                const dist = Vector.dist(p.x, p.y, enemy.x, enemy.y);
+                if (dist < empRadius + enemy.radius) {
+                    const empDmg = 40;
+                    enemy.hp -= empDmg;
+                    enemy.stunTimer = 3000; // Choáng 3 giây
+                    
+                    this.floatingTexts.push(new FloatingText(enemy.x, enemy.y - 15, `${empDmg} EMP ⚡`, '#00f0ff', 15));
+                    this.spawnBloodParticles(enemy.x, enemy.y, '#00f0ff', 6);
+                }
+            }
+        });
+        
+        // Check for enemy deaths
+        for (let j = this.enemies.length - 1; j >= 0; j--) {
+            const enemy = this.enemies[j];
+            if (enemy.hp <= 0) {
+                this.onEnemyKilled(enemy, j);
+            }
+        }
+        
+        this.pillars.splice(pIdx, 1);
+    }
+
     // --- ITEM COLLECTION ---
     collectItem(item) {
         sounds.playPickup();
@@ -2532,6 +3122,16 @@ class Game {
             const leveledUp = this.player.addXp(item.value);
             this.floatingTexts.push(new FloatingText(this.player.x, this.player.y - 25, `+${item.value} XP`, '#39ff14', 15));
             
+            // Tích lũy năng lượng Overclock
+            if (this.player && !this.player.overclockActive) {
+                this.player.overclockEnergy = Math.min(100, (this.player.overclockEnergy || 0) + 1.0);
+            }
+
+            // Lõi nanoDrain: Hồi 1 HP khi nhặt XP
+            if (this.player.upgrades.nanoDrain > 0) {
+                this.player.hp = Math.min(this.player.maxHp, this.player.hp + 1);
+            }
+
             if (leveledUp) {
                 this.triggerLevelUp();
             }
@@ -3015,8 +3615,15 @@ class Game {
             },
             {
                 id: 'laserDrone',
-                title: 'Laser Drone Mini',
-                desc: this.player.subWeapons.laserDrone > 0 ? 'Drone bắn tia laser phụ trợ nhanh hơn.' : 'Robot Drone mini hộ tống tự động ngắm bắn kẻ địch gần nhất.',
+                title: 'Drone Chiến Thuật',
+                desc: this.player.subWeapons.laserDrone > 0 
+                    ? [
+                        '',
+                        'Drone Lv2: Mở khóa Lá chắn (Shield) chặn đạn phía trước.',
+                        'Drone Lv3: Mở khóa Hacking phát tia hack virus làm đồng minh (6s).',
+                        'Drone Lv4: Mở khóa Nano-Repair tự động hồi HP khẩn cấp khi thấp.'
+                      ][Math.min(3, this.player.subWeapons.laserDrone)] || 'Drone Lv Max: Tối đa hóa mọi chỉ số hỗ trợ.'
+                    : 'Robot Drone mini hộ tống tự động ngắm bắn kẻ địch. Nâng cấp để mở khóa thêm các tính năng chiến thuật cực mạnh.',
                 stat: this.player.subWeapons.laserDrone > 0 ? `Cấp ${this.player.subWeapons.laserDrone} -> ${this.player.subWeapons.laserDrone + 1}` : 'Mở khóa Cấp 1',
                 icon: '🤖',
                 class: 'card-green'
@@ -3131,6 +3738,30 @@ class Game {
                 badge.classList.add('hidden');
             }
         }
+
+        // Cập nhật HUD Overclock
+        const overclockFill = document.getElementById('hud-overclock-fill');
+        const overclockText = document.getElementById('hud-overclock-text');
+        const overclockPrompt = document.getElementById('overclock-prompt');
+        
+        if (overclockFill) {
+            const pct = Math.min(100, Math.floor(this.player.overclockEnergy || 0));
+            overclockFill.style.width = `${pct}%`;
+            
+            if (overclockText) {
+                overclockText.textContent = this.player.overclockActive 
+                    ? `OVERCLOCKED! ${Math.ceil(this.player.overclockTimer / 1000)}s` 
+                    : `${pct}%`;
+            }
+            
+            if (overclockPrompt) {
+                if (pct >= 100 && !this.player.overclockActive) {
+                    overclockPrompt.classList.remove('hidden');
+                } else {
+                    overclockPrompt.classList.add('hidden');
+                }
+            }
+        }
     }
 
     // --- DRAW GRAPHICS ON CANVAS ---
@@ -3160,6 +3791,9 @@ class Game {
         } else if (this.mapTheme === 'highland') {
             bgStyle = '#0e0d16'; // Misty highland night violet-black
             gridStroke = 'rgba(217, 70, 239, 0.08)'; // Purple/magenta grid
+        }
+        if (this.disasterActive && this.disasterType === 'matrix_protocol') {
+            gridStroke = 'rgba(57, 255, 20, 0.18)';
         }
         
         this.ctx.fillStyle = bgStyle;
@@ -3356,6 +3990,128 @@ class Game {
             }
         });
 
+        // Vẽ Cổng Chợ Đen (Merchant Portal)
+        if (this.merchantActive && this.merchantPortal) {
+            const portal = this.merchantPortal;
+            if (this.isInView(portal.x, portal.y, portal.radius + 100)) {
+                const sX = portal.x - this.camera.x;
+                const sY = portal.y - this.camera.y;
+                
+                this.ctx.save();
+                this.ctx.translate(sX, sY);
+                
+                const rot = (portal.pulseTimer || 0) * 0.003;
+                this.ctx.rotate(rot);
+                
+                const pulse = 1 + Math.sin((portal.pulseTimer || 0) * 0.008) * 0.1;
+                const rad = portal.radius * pulse;
+                
+                this.ctx.strokeStyle = '#ff2255';
+                this.ctx.shadowColor = '#ff2255';
+                this.ctx.shadowBlur = 15;
+                this.ctx.lineWidth = 4;
+                this.ctx.beginPath();
+                this.ctx.arc(0, 0, rad, 0, Math.PI * 2);
+                this.ctx.stroke();
+                
+                this.ctx.rotate(-rot * 2);
+                this.ctx.strokeStyle = '#ff0033';
+                this.ctx.lineWidth = 2;
+                this.ctx.beginPath();
+                for (let i = 0; i < 4; i++) {
+                    const angle = (Math.PI / 2) * i;
+                    this.ctx.moveTo(0, 0);
+                    this.ctx.quadraticCurveTo(Math.cos(angle + 0.5) * rad * 0.7, Math.sin(angle + 0.5) * rad * 0.7, Math.cos(angle) * rad, Math.sin(angle) * rad);
+                }
+                this.ctx.stroke();
+                
+                const grad = this.ctx.createRadialGradient(0, 0, 0, 0, 0, rad);
+                grad.addColorStop(0, 'rgba(15, 0, 5, 0.9)');
+                grad.addColorStop(0.6, 'rgba(100, 0, 20, 0.7)');
+                grad.addColorStop(1, 'rgba(255, 0, 50, 0)');
+                this.ctx.fillStyle = grad;
+                this.ctx.beginPath();
+                this.ctx.arc(0, 0, rad, 0, Math.PI * 2);
+                this.ctx.fill();
+                
+                this.ctx.restore();
+                
+                this.ctx.save();
+                this.ctx.fillStyle = '#ff2255';
+                this.ctx.shadowColor = '#ff2255';
+                this.ctx.shadowBlur = 8;
+                this.ctx.font = 'bold 13px Courier New, monospace';
+                this.ctx.textAlign = 'center';
+                this.ctx.fillText('📡 HACK PORTAL', sX, sY - rad - 12);
+                
+                const remainingSec = Math.ceil(portal.life / 1000);
+                this.ctx.fillStyle = '#ffffff';
+                this.ctx.font = '10px Courier New, monospace';
+                this.ctx.fillText(`ĐÓNG SAU: ${remainingSec}s`, sX, sY + rad + 15);
+                this.ctx.restore();
+            }
+        }
+
+        // Vẽ Hố đen ma pháp (Gravity Singularities)
+        if (this.singularities) {
+            this.singularities.forEach(s => {
+                s.draw(this.ctx, this.camera);
+            });
+        }
+
+        // Vẽ Phân Thân Bóng Tối (Shadow Clones)
+        if (this.shadowClones) {
+            this.shadowClones.forEach(c => {
+                c.draw(this.ctx, this.camera);
+            });
+        }
+
+        // Vẽ chùm tia hủy diệt của Ranger Overclock
+        if (this.player && this.player.role === 'ranger' && this.player.overclockActive && this.mouse.isDown) {
+            const startX = this.player.x - this.camera.x;
+            const startY = this.player.y - this.camera.y;
+            const angle = this.player.angle;
+            const maxLen = 700;
+            const endX = startX + Math.cos(angle) * maxLen;
+            const endY = startY + Math.sin(angle) * maxLen;
+            
+            this.ctx.save();
+            
+            // Outer thick cyan glowing beam
+            this.ctx.strokeStyle = 'rgba(0, 240, 255, 0.4)';
+            this.ctx.lineWidth = 26;
+            this.ctx.lineCap = 'round';
+            this.ctx.beginPath();
+            this.ctx.moveTo(startX, startY);
+            this.ctx.lineTo(endX, endY);
+            this.ctx.stroke();
+            
+            // Middle cyan beam
+            this.ctx.strokeStyle = '#00f0ff';
+            this.ctx.lineWidth = 12;
+            this.ctx.beginPath();
+            this.ctx.moveTo(startX, startY);
+            this.ctx.lineTo(endX, endY);
+            this.ctx.stroke();
+            
+            // Inner white core
+            this.ctx.strokeStyle = '#ffffff';
+            this.ctx.lineWidth = 4;
+            this.ctx.beginPath();
+            this.ctx.moveTo(startX, startY);
+            this.ctx.lineTo(endX, endY);
+            this.ctx.stroke();
+            
+            // Laser sparks/particles at muzzle
+            if (Math.random() < 0.3) {
+                const px = this.player.x + Math.cos(angle) * 35;
+                const py = this.player.y + Math.sin(angle) * 35;
+                this.particles.push(new Particle(px, py, '#00f0ff'));
+            }
+            
+            this.ctx.restore();
+        }
+
         // 5. Vẽ các viên đạn (Bullets)
         this.bullets.forEach(bullet => {
             if (this.isInView(bullet.x, bullet.y, bullet.radius)) {
@@ -3458,6 +4214,24 @@ class Game {
             const dx = this.player.droneX - this.camera.x;
             const dy = this.player.droneY - this.camera.y;
             
+            // 0. Xác định màu sắc Drone theo Cấp/Tính năng
+            let droneColor = '#39ff14'; // Cấp 1 (Lục)
+            let droneGlow = 'rgba(57, 255, 20, 0.25)';
+            let droneBody = 'rgba(10, 20, 10, 0.9)';
+            if (this.player.subWeapons.laserDrone === 2) {
+                droneColor = '#00f0ff'; // Cấp 2: Cyan (Shield)
+                droneGlow = 'rgba(0, 240, 255, 0.25)';
+                droneBody = 'rgba(10, 20, 20, 0.9)';
+            } else if (this.player.subWeapons.laserDrone === 3) {
+                droneColor = '#ff00ff'; // Cấp 3: Hồng (Hacking)
+                droneGlow = 'rgba(255, 0, 255, 0.25)';
+                droneBody = 'rgba(20, 10, 20, 0.9)';
+            } else if (this.player.subWeapons.laserDrone >= 4) {
+                droneColor = '#fffb00'; // Cấp 4+: Vàng (Nano-Repair)
+                droneGlow = 'rgba(255, 251, 0, 0.25)';
+                droneBody = 'rgba(20, 20, 10, 0.9)';
+            }
+
             if (this.isInView(this.player.droneX, this.player.droneY, 20)) {
                 this.ctx.save();
                 this.ctx.translate(dx, dy);
@@ -3467,7 +4241,7 @@ class Game {
                 
                 // 1. Quầng sáng Laser Drone (Outer Glow)
                 this.ctx.globalAlpha = 0.25;
-                this.ctx.strokeStyle = '#39ff14';
+                this.ctx.strokeStyle = droneColor;
                 this.ctx.lineWidth = 6;
                 this.ctx.beginPath();
                 for (let i = 0; i < 6; i++) {
@@ -3482,8 +4256,8 @@ class Game {
 
                 // 2. Thân chính Drone (Solid Core)
                 this.ctx.globalAlpha = 1.0;
-                this.ctx.fillStyle = 'rgba(10, 20, 10, 0.9)';
-                this.ctx.strokeStyle = '#39ff14';
+                this.ctx.fillStyle = droneBody;
+                this.ctx.strokeStyle = droneColor;
                 this.ctx.lineWidth = 2;
                 
                 this.ctx.beginPath();
@@ -3499,7 +4273,7 @@ class Game {
                 this.ctx.stroke();
 
                 // Vẽ 2 cánh nhỏ hai bên
-                this.ctx.strokeStyle = '#39ff14';
+                this.ctx.strokeStyle = droneColor;
                 this.ctx.lineWidth = 1.5;
                 this.ctx.beginPath();
                 this.ctx.moveTo(-8, 0);
@@ -3510,13 +4284,57 @@ class Game {
                 
                 // Mắt cảm biến nhấp nháy
                 const flash = Math.floor(Date.now() / 250) % 2 === 0;
-                this.ctx.fillStyle = flash ? '#ffffff' : '#39ff14';
+                this.ctx.fillStyle = flash ? '#ffffff' : droneColor;
                 this.ctx.beginPath();
                 this.ctx.arc(0, 0, 2.5, 0, Math.PI * 2);
                 this.ctx.fill();
                 
                 this.ctx.restore();
             }
+
+            // Vẽ lá chắn năng lượng phía trước đầu phi thuyền nếu cấp >= 2
+            if (this.player.subWeapons.laserDrone >= 2) {
+                const px = this.player.x - this.camera.x;
+                const py = this.player.y - this.camera.y;
+                const angle = this.player.angle;
+                
+                this.ctx.save();
+                this.ctx.translate(px, py);
+                this.ctx.rotate(angle);
+                
+                // Vòng ngoài phát sáng cyan
+                this.ctx.strokeStyle = 'rgba(0, 240, 255, 0.35)';
+                this.ctx.lineWidth = 6;
+                this.ctx.lineCap = 'round';
+                this.ctx.beginPath();
+                this.ctx.arc(0, 0, 50, -Math.PI / 3, Math.PI / 3);
+                this.ctx.stroke();
+                
+                // Lõi sáng trắng
+                this.ctx.strokeStyle = '#ffffff';
+                this.ctx.lineWidth = 2;
+                this.ctx.beginPath();
+                this.ctx.arc(0, 0, 50, -Math.PI / 3, Math.PI / 3);
+                this.ctx.stroke();
+                
+                this.ctx.restore();
+            }
+        }
+
+        // Vẽ tia Hack của Hacking Drone nếu có hoạt động
+        if (this.activeHackBeam) {
+            const beam = this.activeHackBeam;
+            this.ctx.save();
+            this.ctx.strokeStyle = '#ff00ff';
+            this.ctx.shadowColor = '#ff00ff';
+            this.ctx.shadowBlur = 10;
+            this.ctx.lineWidth = 3;
+            this.ctx.lineCap = 'round';
+            this.ctx.beginPath();
+            this.ctx.moveTo(beam.startX - this.camera.x, beam.startY - this.camera.y);
+            this.ctx.lineTo(beam.endX - this.camera.x, beam.endY - this.camera.y);
+            this.ctx.stroke();
+            this.ctx.restore();
         }
 
         // 9. Vẽ số sát thương trôi nổi (Floating Texts)
@@ -3534,6 +4352,50 @@ class Game {
             this.ctx.restore();
         }
 
+        if (this.player.overclockActive) {
+            this.ctx.save();
+            
+            // Yellow fading vignette overlay
+            const grad = this.ctx.createRadialGradient(
+                this.canvas.width / 2, this.canvas.height / 2, this.canvas.width * 0.3,
+                this.canvas.width / 2, this.canvas.height / 2, this.canvas.width * 0.7
+            );
+            grad.addColorStop(0, 'rgba(255, 251, 0, 0)');
+            grad.addColorStop(1, 'rgba(255, 251, 0, 0.15)');
+            this.ctx.fillStyle = grad;
+            this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+            
+            // CRT scanlines
+            this.ctx.strokeStyle = 'rgba(255, 251, 0, 0.07)';
+            this.ctx.lineWidth = 1.5;
+            const step = 6;
+            this.ctx.beginPath();
+            for (let y = 0; y < this.canvas.height; y += step) {
+                this.ctx.moveTo(0, y);
+                this.ctx.lineTo(this.canvas.width, y);
+            }
+            this.ctx.stroke();
+            
+            // Random horizontal glitch lines
+            if (Math.random() < 0.15) {
+                this.ctx.fillStyle = 'rgba(255, 251, 0, 0.12)';
+                const gy = Math.random() * this.canvas.height;
+                const gh = 3 + Math.random() * 8;
+                this.ctx.fillRect(0, gy, this.canvas.width, gh);
+            }
+            
+            // Screen vignette/neon overlay label
+            this.ctx.fillStyle = '#fffb00';
+            this.ctx.shadowColor = '#fffb00';
+            this.ctx.shadowBlur = 10;
+            this.ctx.font = 'bold 18px Courier New, monospace';
+            this.ctx.textAlign = 'right';
+            const remainingOverclockSec = (this.player.overclockTimer / 1000).toFixed(1);
+            this.ctx.fillText(`⚡ OVERCLOCK ACTIVE: ${remainingOverclockSec}s`, this.canvas.width - 25, 45);
+            
+            this.ctx.restore();
+        }
+
         this.ctx.restore();
     }
 
@@ -3545,6 +4407,150 @@ class Game {
             y + radius > this.camera.y &&
             y - radius < this.camera.y + this.canvas.height
         );
+    }
+
+    triggerOverclock() {
+        if (this.state !== 'PLAYING') return;
+        if (this.player.overclockActive) return;
+        if (this.player.overclockEnergy < 100) return;
+        
+        this.player.overclockActive = true;
+        this.player.overclockTimer = 8000; // 8 seconds
+        this.player.overclockEnergy = 0;
+        
+        sounds.playPowerup();
+        this.floatingTexts.push(new FloatingText(this.player.x, this.player.y - 40, 'SYSTEM OVERCLOCK ACTIVE! ⚡', '#fffb00', 22));
+        this.triggerScreenShake(15, 400);
+        this.addGridDistortion(this.player.x, this.player.y, 250, 60, 500);
+
+        if (this.player.role === 'assassin') {
+            const cloneDamage = Math.floor(this.player.damage * 0.8 * (1 + this.player.upgrades.damage * 0.25));
+            for (let i = 0; i < 3; i++) {
+                const angle = (i * Math.PI * 2) / 3;
+                const cloneX = this.player.x + Math.cos(angle) * 80;
+                const cloneY = this.player.y + Math.sin(angle) * 80;
+                this.shadowClones.push(new ShadowClone(cloneX, cloneY, cloneDamage));
+            }
+        }
+    }
+
+    triggerHackedShop() {
+        this.state = 'HACKED_SHOP';
+        sounds.stopMusic();
+        sounds.playPowerup();
+        
+        const shopEl = document.getElementById('hacked-shop-menu');
+        if (shopEl) shopEl.classList.remove('hidden');
+        
+        const allHackedPool = [
+            {
+                id: 'glassCore',
+                name: 'LÕI THỦY TINH',
+                desc: 'Tăng cực hạn <span class="buff-text">+150% Sát thương</span>, nhưng khóa HP tối đa ở <span class="debuff-text">35 HP</span>.',
+                stat: '+150% DMG / 35 Max HP',
+                cost: 20,
+                icon: '💎'
+            },
+            {
+                id: 'overheated',
+                name: 'ÉP XUNG QUÁ NHIỆT',
+                desc: 'Tăng điên cuồng <span class="buff-text">+80% Tốc độ bắn</span>, nhưng <span class="debuff-text">tự mất 1 HP mỗi 1.2 giây</span>.',
+                stat: '+80% Fire Rate / -1 HP mỗi 1.2s',
+                cost: 15,
+                icon: '🔥'
+            },
+            {
+                id: 'lagSwitch',
+                name: 'TRỄ TẦN SỐ (LAG)',
+                desc: 'Làm chậm toàn bộ virus đi <span class="buff-text">35%</span>, nhưng <span class="debuff-text">hồi chiêu Lướt (Dash) tăng 100%</span>.',
+                stat: '-35% Enemy Speed / +100% CD Dash',
+                cost: 18,
+                icon: '⏳'
+            },
+            {
+                id: 'limitBreak',
+                name: 'PHÁ VỠ GIỚI HẠN',
+                desc: 'Tăng mạnh mẽ <span class="buff-text">+30% Tốc độ chạy</span>, nhưng <span class="debuff-text">nhận thêm 25% sát thương</span>.',
+                stat: '+30% Speed / +25% DMG Taken',
+                cost: 12,
+                icon: '🚀'
+            },
+            {
+                id: 'nanoDrain',
+                name: 'NANO HÚT NĂNG LƯỢNG',
+                desc: 'Nhặt ngọc XP giúp <span class="buff-text">hồi 1 HP</span>, nhưng làm <span class="debuff-text">giảm 20% sát thương</span> đòn chính.',
+                stat: 'XP heals 1 HP / -20% Sát thương',
+                cost: 15,
+                icon: '🧪'
+            }
+        ];
+        
+        const pool = [...allHackedPool].sort(() => 0.5 - Math.random()).slice(0, 3);
+        const choicesGrid = document.getElementById('hacked-shop-choices');
+        if (choicesGrid) {
+            choicesGrid.innerHTML = '';
+            pool.forEach(upgrade => {
+                const card = document.createElement('div');
+                card.className = 'upgrade-card glassmorphism-card hacked-upgrade-card';
+                
+                const hasEnoughXp = this.player.xp >= upgrade.cost;
+                const costClass = hasEnoughXp ? 'hacked-card-cost' : 'hacked-card-cost insufficient';
+                
+                card.innerHTML = `
+                    <div class="card-glow-red"></div>
+                    <div class="card-icon">${upgrade.icon}</div>
+                    <h3>${upgrade.name}</h3>
+                    <p>${upgrade.desc}</p>
+                    <span class="card-stat">${upgrade.stat}</span>
+                    <div class="${costClass}">Yêu cầu: ${upgrade.cost} XP (Hiện có: ${Math.floor(this.player.xp)} XP)</div>
+                `;
+                
+                card.addEventListener('click', () => {
+                    if (this.player.xp >= upgrade.cost) {
+                        this.player.xp -= upgrade.cost;
+                        this.applyHackedUpgrade(upgrade.id);
+                        this.closeHackedShop();
+                    } else {
+                        sounds.playHit();
+                        this.floatingTexts.push(new FloatingText(this.player.x, this.player.y - 25, "KHÔNG ĐỦ XP!", "#ff3131", 16));
+                    }
+                });
+                
+                choicesGrid.appendChild(card);
+            });
+        }
+    }
+
+    applyHackedUpgrade(id) {
+        sounds.playPowerup();
+        this.floatingTexts.push(new FloatingText(this.player.x, this.player.y - 30, 'LÕI ĐÃ ĐỘT BIẾN! ⚠️', '#ff3131', 20));
+        
+        if (id === 'glassCore') {
+            this.player.upgrades.glassCore = (this.player.upgrades.glassCore || 0) + 1;
+            this.player.damage *= 2.5;
+            this.player.maxHp = 35;
+            this.player.hp = Math.min(this.player.hp, 35);
+        } else if (id === 'overheated') {
+            this.player.upgrades.overheated = (this.player.upgrades.overheated || 0) + 1;
+            this.player.fireRate *= 0.55;
+        } else if (id === 'lagSwitch') {
+            this.player.upgrades.lagSwitch = (this.player.upgrades.lagSwitch || 0) + 1;
+            this.player.dashCooldownMax *= 2.0;
+        } else if (id === 'limitBreak') {
+            this.player.upgrades.limitBreak = (this.player.upgrades.limitBreak || 0) + 1;
+            this.player.speed *= 1.3;
+        } else if (id === 'nanoDrain') {
+            this.player.upgrades.nanoDrain = (this.player.upgrades.nanoDrain || 0) + 1;
+            this.player.damage *= 0.8;
+        }
+    }
+
+    closeHackedShop() {
+        const shopEl = document.getElementById('hacked-shop-menu');
+        if (shopEl) shopEl.classList.add('hidden');
+        this.state = 'PLAYING';
+        sounds.playMusic();
+        this.lastTime = performance.now();
     }
 }
 

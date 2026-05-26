@@ -90,6 +90,16 @@ export class Enemy {
                 this.color = '#ff00ff'; // Hồng/tím neon
                 this.portalSpawnTimer = 0;
                 break;
+            case 'gold_bug':
+                this.radius = 16;
+                this.speed = 4.2; // Rất nhanh
+                this.hp = Math.floor(40 * mult);
+                this.maxHp = this.hp;
+                this.damage = 0; // Không gây sát thương va chạm
+                this.xpValue = 35; // Điểm kinh nghiệm rất cao
+                this.color = '#fffb00'; // Vàng neon
+                this.goldBugTeleportTimer = 0;
+                break;
             case 'runner':
             default:
                 this.radius = 14;
@@ -158,19 +168,95 @@ export class Enemy {
             return;
         }
 
-        this.angle = Vector.angle(this.x, this.y, player.x, player.y);
-        const distToPlayer = Vector.dist(this.x, this.y, player.x, player.y);
+        if (this.type === 'gold_bug') {
+            // Gold Bug teleport liên tục mỗi 1.5 giây
+            this.goldBugTeleportTimer = (this.goldBugTeleportTimer || 0) + deltaTime;
+            if (this.goldBugTeleportTimer >= 1500) {
+                this.goldBugTeleportTimer = 0;
+                // Teleport ngẫu nhiên xung quanh vị trí hiện tại
+                const angle = Math.random() * Math.PI * 2;
+                const dist = 100 + Math.random() * 120;
+                const tx = this.x + Math.cos(angle) * dist;
+                const ty = this.y + Math.sin(angle) * dist;
+                
+                if (gameEngineRef) {
+                    gameEngineRef.spawnBloodParticles(this.x, this.y, '#fffb00', 8);
+                    sounds.playPickup(); // Teleport sound
+                }
+                
+                this.x = Math.max(this.radius + 30, Math.min(3000 - this.radius - 30, tx));
+                this.y = Math.max(this.radius + 30, Math.min(3000 - this.radius - 30, ty));
+                
+                if (gameEngineRef) {
+                    gameEngineRef.spawnBloodParticles(this.x, this.y, '#ffffff', 8);
+                }
+            }
+
+            // Chạy trốn khỏi người chơi
+            this.angle = Vector.angle(player.x, player.y, this.x, this.y);
+            this.x += Math.cos(this.angle) * currentSpeed;
+            this.y += Math.sin(this.angle) * currentSpeed;
+            
+            this.x = Math.max(this.radius, Math.min(3000 - this.radius, this.x));
+            this.y = Math.max(this.radius, Math.min(3000 - this.radius, this.y));
+            return;
+        }
+
+        // Xử lý Hacked (Drone Cấp 3+)
+        let target = player;
+        let isHackedTarget = false;
+
+        if (this.isHacked) {
+            this.hackTimer -= deltaTime;
+            if (this.hackTimer <= 0) {
+                this.isHacked = false;
+                // Khôi phục màu mặc định của quái vật
+                if (this.type === 'runner') this.color = '#ff007f';
+                else if (this.type === 'tanker') this.color = '#b026ff';
+                else if (this.type === 'shooter') this.color = '#ffaa00';
+                else if (this.type === 'sniper') this.color = '#ff0055';
+            } else {
+                // Nhắm vào quái vật khác gần nhất
+                if (gameEngineRef && gameEngineRef.enemies) {
+                    let nearestEnemy = null;
+                    let minDist = Infinity;
+                    gameEngineRef.enemies.forEach(other => {
+                        if (other !== this && other.hp > 0 && !other.isHacked && other.type !== 'mine' && other.type !== 'portal') {
+                            const d = Vector.dist(this.x, this.y, other.x, other.y);
+                            if (d < minDist) {
+                                minDist = d;
+                                nearestEnemy = other;
+                            }
+                        }
+                    });
+                    if (nearestEnemy) {
+                        target = nearestEnemy;
+                        isHackedTarget = true;
+                    }
+                }
+            }
+        }
+
+        // Lưu mục tiêu để vẽ tia laser ngắm bắn
+        this.targetX = target.x;
+        this.targetY = target.y;
+
+        this.angle = Vector.angle(this.x, this.y, target.x, target.y);
+        const distToTarget = Vector.dist(this.x, this.y, target.x, target.y);
 
         const isFrequencyGlitch = window.gameEngine && window.gameEngine.disasterActive && window.gameEngine.disasterType === 'frequency_glitch';
-        const currentSpeed = isFrequencyGlitch ? this.speed * 2.0 : this.speed;
+        let currentSpeed = isFrequencyGlitch ? this.speed * 2.0 : this.speed;
+        if (window.gameEngine && window.gameEngine.player && window.gameEngine.player.upgrades.lagSwitch > 0) {
+            currentSpeed *= 0.65; // Giảm 35% tốc độ của quái vật do Lag Switch
+        }
 
         // Logic di chuyển cho từng loại quái vật
         if (this.type === 'shooter') {
-            // Giữ khoảng cách tầm 250px với người chơi
-            if (distToPlayer > 280) {
+            // Giữ khoảng cách tầm 250px với mục tiêu
+            if (distToTarget > 280) {
                 this.x += Math.cos(this.angle) * currentSpeed;
                 this.y += Math.sin(this.angle) * currentSpeed;
-            } else if (distToPlayer < 200) {
+            } else if (distToTarget < 200) {
                 this.x -= Math.cos(this.angle) * currentSpeed;
                 this.y -= Math.sin(this.angle) * currentSpeed;
             } else {
@@ -180,20 +266,20 @@ export class Enemy {
                 this.y += Math.sin(tangentAngle) * (currentSpeed * 0.5);
             }
 
-            // Tự bắn đạn vào người chơi mỗi 2 giây
+            // Tự bắn đạn vào mục tiêu mỗi 2 giây
             const shootInterval = isFrequencyGlitch ? 1000 : 2000;
             this.shootTimer += deltaTime;
             if (this.shootTimer >= shootInterval) {
                 this.shootTimer = 0;
-                this.shootAtPlayer(player, gameBullets);
+                this.shootAtTarget(target, gameBullets, isHackedTarget);
             }
         } else if (this.type === 'sniper') {
-            // Sniper di chuyển giữ khoảng cách 300-450px với player
-            if (distToPlayer > 450) {
+            // Sniper di chuyển giữ khoảng cách 300-450px với mục tiêu
+            if (distToTarget > 450) {
                 this.x += Math.cos(this.angle) * currentSpeed;
                 this.y += Math.sin(this.angle) * currentSpeed;
                 this.sniperAimTimer = Math.max(0, this.sniperAimTimer - (isFrequencyGlitch ? deltaTime : deltaTime * 0.5)); // Giảm nhắm khi di chuyển
-            } else if (distToPlayer < 300) {
+            } else if (distToTarget < 300) {
                 this.x -= Math.cos(this.angle) * currentSpeed;
                 this.y -= Math.sin(this.angle) * currentSpeed;
                 this.sniperAimTimer = Math.max(0, this.sniperAimTimer - (isFrequencyGlitch ? deltaTime : deltaTime * 0.5)); // Giảm nhắm khi di chuyển
@@ -202,11 +288,11 @@ export class Enemy {
                 this.sniperAimTimer += isFrequencyGlitch ? deltaTime * 2 : deltaTime;
                 if (this.sniperAimTimer >= 1200) {
                     this.sniperAimTimer = 0;
-                    this.shootSniperBullet(player, gameBullets);
+                    this.shootSniperBulletAtTarget(target, gameBullets, isHackedTarget);
                 }
             }
         } else {
-            // Runner và Tanker: đuổi thẳng tới người chơi
+            // Runner và Tanker: đuổi thẳng tới mục tiêu
             this.x += Math.cos(this.angle) * currentSpeed;
             this.y += Math.sin(this.angle) * currentSpeed;
         }
@@ -216,9 +302,9 @@ export class Enemy {
         this.y = Math.max(this.radius, Math.min(3000 - this.radius, this.y));
     }
 
-    shootAtPlayer(player, gameBullets) {
-        // Bắn 1 tia đạn đỏ hướng tới người chơi
-        const bulletAngle = Vector.angle(this.x, this.y, player.x, player.y);
+    shootAtTarget(target, gameBullets, isHackedTarget = false) {
+        // Bắn 1 tia đạn hướng tới mục tiêu
+        const bulletAngle = Vector.angle(this.x, this.y, target.x, target.y);
         const bSpeed = 5;
         const vx = Math.cos(bulletAngle) * bSpeed;
         const vy = Math.sin(bulletAngle) * bSpeed;
@@ -230,14 +316,14 @@ export class Enemy {
             vy,
             6, // Bán kính đạn nhỏ
             this.damage,
-            '#ff3131', // Đỏ neon
-            false // Đạn của quái vật
+            isHackedTarget ? '#ff00ff' : '#ff3131', // Hồng neon đồng minh / Đỏ neon kẻ địch
+            isHackedTarget // Nếu hacked thì đạn gây hại cho quái vật (là đạn người chơi)
         ));
     }
 
-    shootSniperBullet(player, gameBullets) {
+    shootSniperBulletAtTarget(target, gameBullets, isHackedTarget = false) {
         sounds.playShoot();
-        const bulletAngle = Vector.angle(this.x, this.y, player.x, player.y);
+        const bulletAngle = Vector.angle(this.x, this.y, target.x, target.y);
         const bSpeed = 16;
         const vx = Math.cos(bulletAngle) * bSpeed;
         const vy = Math.sin(bulletAngle) * bSpeed;
@@ -249,10 +335,11 @@ export class Enemy {
             vy,
             5,
             this.damage,
-            '#ff00ff', // Đạn màu hồng neon
-            false // Đạn của quái vật
+            isHackedTarget ? '#00ffff' : '#ff00ff', // Cyan neon đồng minh / Hồng neon kẻ địch
+            isHackedTarget
         ));
     }
+
 
     applyKnockback(angle, force) {
         const isZeroGravity = window.gameEngine && window.gameEngine.disasterActive && window.gameEngine.disasterType === 'zero_gravity';
@@ -326,26 +413,30 @@ export class Enemy {
         }
 
         // Vẽ tia laser ngắm bắn của Sniper lên mặt đất trước (Khử shadowBlur)
-        if (this.type === 'sniper' && this.sniperAimTimer > 0 && window.gameEngine && window.gameEngine.player) {
-            const player = window.gameEngine.player;
+        if (this.type === 'sniper' && this.sniperAimTimer > 0) {
+            const tx = this.targetX !== undefined ? this.targetX : (window.gameEngine && window.gameEngine.player ? window.gameEngine.player.x : 0);
+            const ty = this.targetY !== undefined ? this.targetY : (window.gameEngine && window.gameEngine.player ? window.gameEngine.player.y : 0);
+            const isHackedLaser = this.isHacked;
             ctx.save();
             
             // 1. Quầng sáng laser (Outer Glow)
             ctx.globalAlpha = 0.2;
-            ctx.strokeStyle = '#ff00ff';
+            ctx.strokeStyle = isHackedLaser ? '#00f0ff' : '#ff00ff';
             ctx.lineWidth = 4 + (this.sniperAimTimer / 1200) * 3.0;
             ctx.beginPath();
             ctx.moveTo(screenX, screenY);
-            ctx.lineTo(player.x - camera.x, player.y - camera.y);
+            ctx.lineTo(tx - camera.x, ty - camera.y);
             ctx.stroke();
 
             // 2. Tia laser chính (Solid Core)
             ctx.globalAlpha = 0.85;
-            ctx.strokeStyle = `rgba(255, 0, 255, ${0.45 + (this.sniperAimTimer / 1200) * 0.55})`;
+            ctx.strokeStyle = isHackedLaser 
+                ? `rgba(0, 240, 255, ${0.45 + (this.sniperAimTimer / 1200) * 0.55})`
+                : `rgba(255, 0, 255, ${0.45 + (this.sniperAimTimer / 1200) * 0.55})`;
             ctx.lineWidth = 1 + (this.sniperAimTimer / 1200) * 1.5;
             ctx.beginPath();
             ctx.moveTo(screenX, screenY);
-            ctx.lineTo(player.x - camera.x, player.y - camera.y);
+            ctx.lineTo(tx - camera.x, ty - camera.y);
             ctx.stroke();
             
             ctx.restore();
@@ -398,6 +489,43 @@ export class Enemy {
             ctx.beginPath();
             ctx.arc(0, 0, this.radius * 0.4, 0, Math.PI * 2);
             ctx.fill();
+            ctx.restore();
+            return;
+        }
+
+        if (this.type === 'gold_bug') {
+            ctx.save();
+            ctx.translate(screenX, screenY);
+            
+            const glitchOffset = (Math.random() - 0.5) * 5;
+            const glitchScale = 1.0 + (Math.random() - 0.5) * 0.25;
+            ctx.scale(glitchScale, glitchScale);
+            
+            const colors = ['#fffb00', '#00f0ff', '#ffffff'];
+            const randColor = colors[Math.floor(Math.random() * colors.length)];
+            
+            ctx.globalAlpha = 0.3;
+            ctx.fillStyle = randColor;
+            ctx.beginPath();
+            ctx.arc(glitchOffset, glitchOffset, this.radius * 2.2, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.globalAlpha = 1.0;
+            ctx.fillStyle = 'rgba(10, 10, 0, 0.85)';
+            ctx.strokeStyle = '#fffb00';
+            ctx.lineWidth = 2.5;
+            ctx.beginPath();
+            ctx.moveTo(0, -this.radius * 1.4);
+            ctx.lineTo(this.radius * 1.0, 0);
+            ctx.lineTo(0, this.radius * 1.4);
+            ctx.lineTo(-this.radius * 1.0, 0);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+            
+            ctx.fillStyle = randColor;
+            ctx.fillRect(-this.radius * 0.4, -this.radius * 0.4, this.radius * 0.8, this.radius * 0.8);
+            
             ctx.restore();
             return;
         }

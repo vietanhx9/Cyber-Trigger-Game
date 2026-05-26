@@ -1,5 +1,8 @@
 import { Vector } from '../utils/vector.js';
 import { Particle } from '../effects/particle.js';
+import { BlastRing } from '../effects/blastRing.js';
+import { FloatingText } from '../effects/floatingText.js';
+import { sounds } from '../audio/soundManager.js';
 
 // Bullet Entity
 export class Bullet {
@@ -319,6 +322,141 @@ export class HomingMissile {
         ctx.closePath();
         ctx.fill();
 
+        ctx.restore();
+    }
+}
+
+// Gravity Singularity (Hố đen ma thuật của Mage)
+export class GravitySingularity {
+    constructor(x, y, damage, color = '#b026ff') {
+        this.x = x;
+        this.y = y;
+        this.damage = damage;
+        this.color = color;
+        this.radius = 20;
+        this.maxRadius = 130;
+        this.pullRadius = 250;
+        this.lifeMax = 3000; // 3 giây hoạt động
+        this.life = this.lifeMax;
+        this.damageTimer = 0;
+    }
+
+    update(enemies, deltaTime, gameEngine) {
+        this.life -= deltaTime;
+        
+        // Bán kính nhấp nháy & phình to dần
+        const ratio = (this.lifeMax - this.life) / this.lifeMax;
+        this.radius = 20 + Math.sin(Date.now() * 0.015) * 10 + ratio * 30;
+        
+        // Hút quái vật xung quanh
+        enemies.forEach(enemy => {
+            if (enemy.hp > 0 && enemy.type !== 'mine' && enemy.type !== 'portal') {
+                const dist = Vector.dist(this.x, this.y, enemy.x, enemy.y);
+                if (dist < this.pullRadius) {
+                    const angle = Vector.angle(enemy.x, enemy.y, this.x, this.y);
+                    // Lực hút tăng dần khi ở gần tâm
+                    const pullStrength = (1 - dist / this.pullRadius) * 5.0 * (deltaTime / 16.67);
+                    enemy.x += Math.cos(angle) * pullStrength;
+                    enemy.y += Math.sin(angle) * pullStrength;
+                }
+            }
+        });
+
+        // Gây sát thương lan tỏa mỗi 150ms
+        this.damageTimer += deltaTime;
+        if (this.damageTimer >= 150) {
+            this.damageTimer = 0;
+            enemies.forEach((enemy, idx) => {
+                if (enemy.hp > 0 && enemy.type !== 'mine' && enemy.type !== 'portal') {
+                    const dist = Vector.dist(this.x, this.y, enemy.x, enemy.y);
+                    if (dist < this.pullRadius * 0.8) {
+                        const tickDmg = Math.max(1, Math.floor(this.damage * 0.15));
+                        enemy.hp -= tickDmg;
+                        gameEngine.floatingTexts.push(new FloatingText(enemy.x, enemy.y - 10, `${tickDmg}`, '#b026ff', 12));
+                    }
+                }
+            });
+        }
+
+        // Bùng nổ cực đại khi hết thời gian tồn tại
+        if (this.life <= 0) {
+            sounds.playExplosion();
+            gameEngine.triggerScreenShake(12, 350);
+            
+            // Vẽ vòng nổ blast ring tím rộng
+            gameEngine.blastRings.push(new BlastRing(this.x, this.y, this.maxRadius * 1.5, '#b026ff'));
+            
+            // Gây sát thương cực lớn ở vụ nổ cuối cùng
+            enemies.forEach((enemy, idx) => {
+                if (enemy.hp > 0 && enemy.type !== 'mine' && enemy.type !== 'portal') {
+                    const dist = Vector.dist(this.x, this.y, enemy.x, enemy.y);
+                    if (dist < this.maxRadius * 1.5) {
+                        const finalDmg = Math.floor(this.damage * 3.5);
+                        gameEngine.damageEnemy(enemy, finalDmg, 0, 0, idx);
+                    }
+                }
+            });
+            
+            // Tạo các mảnh bụi phép
+            for (let i = 0; i < 25; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const dist = Math.random() * this.maxRadius * 1.2;
+                const px = this.x + Math.cos(angle) * dist;
+                const py = this.y + Math.sin(angle) * dist;
+                gameEngine.particles.push(new Particle(px, py, '#b026ff'));
+            }
+            return true; // Kết thúc
+        }
+        return false;
+    }
+
+    draw(ctx, camera) {
+        const sX = this.x - camera.x;
+        const sY = this.y - camera.y;
+        
+        ctx.save();
+        ctx.translate(sX, sY);
+        
+        // Vẽ vòng tròn biểu thị vùng hút
+        ctx.save();
+        ctx.rotate(-Date.now() * 0.002);
+        ctx.strokeStyle = 'rgba(176, 38, 255, 0.15)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(0, 0, this.pullRadius, 0, Math.PI * 2);
+        ctx.stroke();
+        
+        // Vẽ chùm bụi sáng xoắn vào tâm
+        for (let i = 0; i < 4; i++) {
+            ctx.rotate(Math.PI / 2);
+            ctx.beginPath();
+            ctx.arc(0, 0, this.pullRadius * (1 - (Date.now() % 1000) / 1000), -0.5, 0.5);
+            ctx.stroke();
+        }
+        ctx.restore();
+
+        // Vẽ lõi lỗ đen (Singularity Core)
+        ctx.save();
+        ctx.rotate(Date.now() * 0.005);
+        
+        // Quầng phát sáng màu tím
+        ctx.globalAlpha = 0.3;
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
+        ctx.arc(0, 0, this.radius * 2, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Lõi trắng viền tím xoáy
+        ctx.globalAlpha = 1.0;
+        ctx.fillStyle = '#ffffff';
+        ctx.strokeStyle = this.color;
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        
+        ctx.restore();
         ctx.restore();
     }
 }

@@ -6,6 +6,8 @@ export class Pillar {
         this.radius = 45;
         this.color = '#475569'; // Sát xi xám đen
         this.neonColor = '#00f0ff'; // Neon xanh cyan phát sáng viền nhẹ
+        this.maxHp = 100;
+        this.hp = this.maxHp;
     }
 
     draw(ctx, camera, theme = 'cyber') {
@@ -239,6 +241,17 @@ export class Pillar {
             ctx.fill();
         }
 
+        // Draw HP ring around the center if damaged
+        if (this.hp < this.maxHp) {
+            ctx.save();
+            ctx.strokeStyle = 'rgba(0, 240, 255, 0.6)';
+            ctx.lineWidth = 3.0;
+            ctx.beginPath();
+            ctx.arc(0, 0, this.radius - 8, -Math.PI / 2, -Math.PI / 2 + (Math.PI * 2 * (this.hp / this.maxHp)));
+            ctx.stroke();
+            ctx.restore();
+        }
+ 
         ctx.restore();
     }
 }
