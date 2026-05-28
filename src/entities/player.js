@@ -303,10 +303,11 @@ export class Player {
             }
         }
 
-        // Giới hạn trong bản đồ thế giới (World size = 3000x3000px)
+        // Giới hạn trong bản đồ thế giới
         const margin = this.radius + 10;
-        this.x = Math.max(margin, Math.min(3000 - margin, this.x));
-        this.y = Math.max(margin, Math.min(3000 - margin, this.y));
+        const worldSize = (window.gameEngine ? window.gameEngine.worldSize : 5000);
+        this.x = Math.max(margin, Math.min(worldSize - margin, this.x));
+        this.y = Math.max(margin, Math.min(worldSize - margin, this.y));
 
         // Nhắm bắn xoay theo chuột
         // Lấy tọa độ chuột trên canvas và dịch chuyển tương ứng với camera để ra tọa độ thế giới

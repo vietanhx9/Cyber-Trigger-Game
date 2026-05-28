@@ -1,3 +1,8 @@
+import { Particle } from '../effects/particle.js';
+import { FloatingText } from '../effects/floatingText.js';
+import { sounds } from '../audio/soundManager.js';
+import { Vector } from '../utils/vector.js';
+
 // Pillar Entity (Chướng ngại vật cứng)
 export class Pillar {
     constructor(x, y) {
@@ -493,6 +498,171 @@ export class Barrel {
             ctx.lineTo(-this.radius * 0.4, this.radius * 0.4);
             ctx.stroke();
         }
+
+        ctx.restore();
+    }
+}
+
+// Wall Entity (Chướng ngại vật tường chữ nhật cứng)
+export class Wall {
+    constructor(x, y, w, h, angle = 0) {
+        this.x = x;
+        this.y = y;
+        this.w = w;
+        this.h = h;
+        this.angle = angle; // Xoay góc
+        this.color = '#334155';
+        this.neonColor = '#ff0055'; // neon viền hồng đỏ
+        this.radius = Math.max(w, h) / 2; // Cận bán kính kiểm tra nhanh va chạm
+    }
+
+    draw(ctx, camera, theme = 'cyber') {
+        const screenX = this.x - camera.x;
+        const screenY = this.y - camera.y;
+
+        ctx.save();
+        ctx.translate(screenX, screenY);
+        ctx.rotate(this.angle);
+
+        // 1. Quầng sáng viền (Outer Glow)
+        ctx.globalAlpha = 0.2;
+        ctx.strokeStyle = this.neonColor;
+        ctx.lineWidth = 10;
+        ctx.strokeRect(-this.w / 2, -this.h / 2, this.w, this.h);
+
+        // 2. Thân chính
+        ctx.globalAlpha = 1.0;
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.95)';
+        ctx.strokeStyle = this.neonColor;
+        ctx.lineWidth = 3;
+        ctx.fillRect(-this.w / 2, -this.h / 2, this.w, this.h);
+        ctx.strokeRect(-this.w / 2, -this.h / 2, this.w, this.h);
+
+        // Vẽ vân lưới công nghệ bên trong bức tường
+        ctx.strokeStyle = 'rgba(255, 0, 85, 0.25)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        for (let offset = -this.w / 2 + 15; offset < this.w / 2; offset += 30) {
+            ctx.moveTo(offset, -this.h / 2);
+            ctx.lineTo(offset, this.h / 2);
+        }
+        ctx.stroke();
+
+        ctx.restore();
+    }
+}
+
+// PortalGate Entity (Cổng dịch chuyển công nghệ)
+export class PortalGate {
+    constructor(x, y, label, color = '#00f0ff') {
+        this.x = x;
+        this.y = y;
+        this.radius = 28;
+        this.label = label;
+        this.color = color; // e.g. '#00f0ff' (Cổng A) hoặc '#ff00ff' (Cổng B)
+        this.targetPortal = null; // Sẽ liên kết sau
+        this.cooldown = 0; // ms
+        this.rotationAngle = 0;
+    }
+
+    update(deltaTime) {
+        if (this.cooldown > 0) {
+            this.cooldown -= deltaTime;
+            if (this.cooldown < 0) this.cooldown = 0;
+        }
+        this.rotationAngle += 0.03 * (deltaTime / 16.67);
+    }
+
+    teleport(entity, gameEngine) {
+        if (!this.targetPortal) return;
+        
+        // Hiệu ứng nổ hạt tại cổng đi
+        gameEngine.spawnBloodParticles(this.x, this.y, this.color, 15);
+        if (gameEngine.particles) {
+            for (let i = 0; i < 8; i++) {
+                gameEngine.particles.push(new Particle(this.x, this.y, '#ffffff'));
+            }
+        }
+        
+        // Di chuyển thực thể sang cổng đích
+        entity.x = this.targetPortal.x;
+        entity.y = this.targetPortal.y;
+        
+        // Đặt hồi chiêu cho cả 2 cổng để chống dịch chuyển ngược vô hạn
+        this.cooldown = 2500;
+        this.targetPortal.cooldown = 2500;
+        
+        // Hiệu ứng nổ hạt tại cổng đến
+        gameEngine.spawnBloodParticles(entity.x, entity.y, this.targetPortal.color, 15);
+        if (gameEngine.particles) {
+            for (let i = 0; i < 8; i++) {
+                gameEngine.particles.push(new Particle(entity.x, entity.y, '#ffffff'));
+            }
+        }
+        
+        // Rung màn hình nhẹ và chạy âm thanh dịch chuyển
+        gameEngine.triggerScreenShake(6, 150);
+        sounds.playPowerup();
+        
+        // Thêm floating text báo dịch chuyển
+        gameEngine.floatingTexts.push(new FloatingText(
+            entity.x, entity.y - entity.radius - 20,
+            "TELEPORTED 📡",
+            this.targetPortal.color,
+            16,
+            false
+        ));
+    }
+
+    draw(ctx, camera) {
+        const screenX = this.x - camera.x;
+        const screenY = this.y - camera.y;
+
+        ctx.save();
+        ctx.translate(screenX, screenY);
+
+        // Vẽ quầng sáng ngoài (Outer Glow)
+        ctx.globalAlpha = 0.15 + Math.sin(Date.now() * 0.01) * 0.05;
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
+        ctx.arc(0, 0, this.radius * 1.5, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Vẽ vòng xoay cổng dịch chuyển
+        ctx.globalAlpha = 1.0;
+        ctx.strokeStyle = this.color;
+        ctx.lineWidth = 3.5;
+        ctx.save();
+        ctx.rotate(this.rotationAngle);
+        ctx.beginPath();
+        ctx.arc(0, 0, this.radius, 0, Math.PI * 0.4);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(0, 0, this.radius, Math.PI * 0.6, Math.PI * 1.0);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(0, 0, this.radius, Math.PI * 1.2, Math.PI * 1.6);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(0, 0, this.radius, Math.PI * 1.8, Math.PI * 2.2);
+        ctx.stroke();
+        ctx.restore();
+
+        // Tâm cổng nhấp nháy
+        if (this.cooldown > 0) {
+            ctx.fillStyle = '#64748b'; // xám khi hồi chiêu
+        } else {
+            ctx.fillStyle = '#ffffff';
+        }
+        ctx.beginPath();
+        ctx.arc(0, 0, 10 + Math.sin(Date.now() * 0.015) * 3, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Nhãn tên cổng
+        ctx.fillStyle = this.color;
+        ctx.font = "bold 11px 'Orbitron', sans-serif";
+        ctx.textAlign = 'center';
+        ctx.fillText(this.label, 0, this.radius + 18);
 
         ctx.restore();
     }

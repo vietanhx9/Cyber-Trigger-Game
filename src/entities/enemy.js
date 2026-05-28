@@ -117,6 +117,7 @@ export class Enemy {
     }
 
     update(player, gameBullets, deltaTime, gameEngineRef) {
+        const worldSize = (window.gameEngine ? window.gameEngine.worldSize : 5000);
         // Giảm lực đẩy lùi (Knockback) theo thời gian (giảm chậm hơn trong Zero Gravity)
         const isZeroGravity = window.gameEngine && window.gameEngine.disasterActive && window.gameEngine.disasterType === 'zero_gravity';
         const decay = isZeroGravity ? 0.95 : 0.8;
@@ -143,8 +144,8 @@ export class Enemy {
             this.stunTimer -= deltaTime;
             if (this.stunTimer < 0) this.stunTimer = 0;
             // Vẫn giới hạn trong bản đồ thế giới đề phòng bị đẩy lùi vượt biên
-            this.x = Math.max(this.radius, Math.min(3000 - this.radius, this.x));
-            this.y = Math.max(this.radius, Math.min(3000 - this.radius, this.y));
+            this.x = Math.max(this.radius, Math.min(worldSize - this.radius, this.x));
+            this.y = Math.max(this.radius, Math.min(worldSize - this.radius, this.y));
             return;
         }
 
@@ -162,8 +163,8 @@ export class Enemy {
                     gameEngineRef.spawnBloodParticles(sx, sy, spawnEnemy.color, 4);
                 }
             }
-            this.x = Math.max(this.radius, Math.min(3000 - this.radius, this.x));
-            this.y = Math.max(this.radius, Math.min(3000 - this.radius, this.y));
+            this.x = Math.max(this.radius, Math.min(worldSize - this.radius, this.x));
+            this.y = Math.max(this.radius, Math.min(worldSize - this.radius, this.y));
             return;
         }
 
@@ -187,8 +188,8 @@ export class Enemy {
                     sounds.playPickup(); // Teleport sound
                 }
                 
-                this.x = Math.max(this.radius + 30, Math.min(3000 - this.radius - 30, tx));
-                this.y = Math.max(this.radius + 30, Math.min(3000 - this.radius - 30, ty));
+                this.x = Math.max(this.radius + 30, Math.min(worldSize - this.radius - 30, tx));
+                this.y = Math.max(this.radius + 30, Math.min(worldSize - this.radius - 30, ty));
                 
                 if (gameEngineRef) {
                     gameEngineRef.spawnBloodParticles(this.x, this.y, '#ffffff', 8);
@@ -200,8 +201,8 @@ export class Enemy {
             this.x += Math.cos(this.angle) * currentSpeed;
             this.y += Math.sin(this.angle) * currentSpeed;
             
-            this.x = Math.max(this.radius, Math.min(3000 - this.radius, this.x));
-            this.y = Math.max(this.radius, Math.min(3000 - this.radius, this.y));
+            this.x = Math.max(this.radius, Math.min(worldSize - this.radius, this.x));
+            this.y = Math.max(this.radius, Math.min(worldSize - this.radius, this.y));
             return;
         }
 
@@ -301,8 +302,8 @@ export class Enemy {
         }
 
         // Giới hạn trong bản đồ thế giới
-        this.x = Math.max(this.radius, Math.min(3000 - this.radius, this.x));
-        this.y = Math.max(this.radius, Math.min(3000 - this.radius, this.y));
+        this.x = Math.max(this.radius, Math.min(worldSize - this.radius, this.x));
+        this.y = Math.max(this.radius, Math.min(worldSize - this.radius, this.y));
     }
 
     shootAtTarget(target, gameBullets, isHackedTarget = false) {
@@ -705,6 +706,7 @@ export class Boss extends Enemy {
     }
 
     update(player, gameBullets, deltaTime, gameEngineRef) {
+        const worldSize = (window.gameEngine ? window.gameEngine.worldSize : 5000);
         // Cảnh báo khiên bảo vệ vừa xuất hiện
         if (!this.spawnShieldAlerted) {
             this.spawnShieldAlerted = true;
@@ -1170,8 +1172,8 @@ export class Boss extends Enemy {
         }
 
         // Giới hạn trong bản đồ thế giới
-        this.x = Math.max(this.radius, Math.min(3000 - this.radius, this.x));
-        this.y = Math.max(this.radius, Math.min(3000 - this.radius, this.y));
+        this.x = Math.max(this.radius, Math.min(worldSize - this.radius, this.x));
+        this.y = Math.max(this.radius, Math.min(worldSize - this.radius, this.y));
         
         // Khôi phục lại speed ban đầu
         this.speed = originalSpeed;

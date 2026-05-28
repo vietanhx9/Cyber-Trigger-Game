@@ -7,7 +7,7 @@ import { Item } from './entities/item.js';
 import { Particle } from './effects/particle.js';
 import { FloatingText } from './effects/floatingText.js';
 import { Hazard } from './hazards/hazard.js';
-import { Pillar, Barrel } from './entities/obstacle.js';
+import { Pillar, Barrel, Wall, PortalGate } from './entities/obstacle.js';
 import { BlastRing } from './effects/blastRing.js';
 import { LightningBolt } from './effects/lightningBolt.js';
 
@@ -98,7 +98,7 @@ class Game {
         this.ctx = this.canvas.getContext('2d');
         
         this.state = 'MENU'; // 'MENU', 'PLAYING', 'UPGRADE', 'GAMEOVER'
-        this.worldSize = 3000;
+        this.worldSize = 5000;
         
         this.player = null;
         this.enemies = [];
@@ -108,6 +108,8 @@ class Game {
         this.floatingTexts = [];
         this.pillars = [];
         this.barrels = [];
+        this.walls = [];
+        this.portalGates = [];
         this.blastRings = [];
         this.homingMissiles = []; // Tên lửa tầm nhiệt đang bay
         this.swordSlashes = [];
@@ -663,6 +665,8 @@ class Game {
         this.floatingTexts = [];
         this.pillars = [];
         this.barrels = [];
+        this.walls = [];
+        this.portalGates = [];
         this.blastRings = [];
         this.homingMissiles = [];
         this.swordSlashes = [];
@@ -693,7 +697,7 @@ class Game {
         this.disasterTickTimer = 0;
 
         // Tạo chướng ngại vật Cột Năng lượng ngẫu nhiên (tránh tâm bản đồ)
-        for (let i = 0; i < 20; i++) {
+        for (let i = 0; i < 35; i++) {
             let px, py, tooClose, attempts = 0;
             do {
                 attempts++;
@@ -718,7 +722,7 @@ class Game {
         }
 
         // Tạo Thùng thuốc nổ ngẫu nhiên
-        for (let i = 0; i < 15; i++) {
+        for (let i = 0; i < 25; i++) {
             let bx, by, tooClose, attempts = 0;
             do {
                 attempts++;
@@ -749,6 +753,70 @@ class Game {
                 this.barrels.push(new Barrel(bx, by));
             }
         }
+
+        // Tạo Tường Công Nghệ (Walls) ngẫu nhiên tránh tâm bản đồ
+        for (let i = 0; i < 12; i++) {
+            let wx, wy, tooClose, attempts = 0;
+            const w = 120 + Math.random() * 100;
+            const h = 30 + Math.random() * 20;
+            const angle = Math.random() < 0.5 ? 0 : Math.PI / 2; // Tường ngang hoặc dọc
+            do {
+                attempts++;
+                wx = Math.random() * (this.worldSize - 400) + 200;
+                wy = Math.random() * (this.worldSize - 400) + 200;
+                tooClose = false;
+                
+                // Tránh tâm bản đồ nơi phi thuyền xuất phát
+                if (Vector.dist(wx, wy, this.worldSize / 2, this.worldSize / 2) < 300) {
+                    tooClose = true;
+                } else {
+                    // Tránh các Pillar đã sinh
+                    for (let p of this.pillars) {
+                        if (Vector.dist(wx, wy, p.x, p.y) < 150) {
+                            tooClose = true;
+                            break;
+                        }
+                    }
+                    if (!tooClose) {
+                        // Tránh va chạm với các thùng thuốc nổ
+                        for (let b of this.barrels) {
+                            if (Vector.dist(wx, wy, b.x, b.y) < 100) {
+                                tooClose = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (!tooClose) {
+                        // Tránh đè lên các bức tường khác
+                        for (let wall of this.walls) {
+                            if (Vector.dist(wx, wy, wall.x, wall.y) < 250) {
+                                tooClose = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+            } while (tooClose && attempts < 50);
+            
+            if (!tooClose) {
+                this.walls.push(new Wall(wx, wy, w, h, angle));
+            }
+        }
+
+        // Tạo 2 cặp Cổng dịch chuyển (Portal Gates) liên kết chéo các góc bản đồ
+        // Cặp A: cổng A1 ở góc (800, 800) và A2 ở góc (worldSize - 800, worldSize - 800) (Cyan)
+        const a1 = new PortalGate(800, 800, "PORTAL A-1", "#00f0ff");
+        const a2 = new PortalGate(this.worldSize - 800, this.worldSize - 800, "PORTAL A-2", "#00f0ff");
+        a1.targetPortal = a2;
+        a2.targetPortal = a1;
+
+        // Cặp B: cổng B1 ở góc (worldSize - 800, 800) và B2 ở góc (800, worldSize - 800) (Magenta)
+        const b1 = new PortalGate(this.worldSize - 800, 800, "PORTAL B-1", "#ff00ff");
+        const b2 = new PortalGate(800, this.worldSize - 800, "PORTAL B-2", "#ff00ff");
+        b1.targetPortal = b2;
+        b2.targetPortal = b1;
+
+        this.portalGates = [a1, a2, b1, b2];
         
         // Khởi tạo các hạt nền đặc trưng cho từng bản đồ (đom đóm, cát, tuyết rơi, cánh hoa ma thuật, bụi vũ trụ)
         this.stars = [];
@@ -1428,6 +1496,9 @@ class Game {
             }
         }
 
+        // Cập nhật Cổng Dịch chuyển (Portal Gates)
+        this.portalGates.forEach(portal => portal.update(deltaTime));
+
         // Xử lý va chạm chướng ngại vật cho Người chơi (Pillars và Barrels)
         this.pillars.forEach(p => {
             const dist = Vector.dist(this.player.x, this.player.y, p.x, p.y);
@@ -1447,6 +1518,48 @@ class Game {
                 const overlap = minDist - dist;
                 this.player.x += Math.cos(angle) * overlap;
                 this.player.y += Math.sin(angle) * overlap;
+            }
+        });
+
+        // Xử lý va chạm Tường Công Nghệ cho Người chơi (Rectangle Walls - AABB vs Circle)
+        this.walls.forEach(wall => {
+            const halfW = (wall.angle === 0) ? wall.w / 2 : wall.h / 2;
+            const halfH = (wall.angle === 0) ? wall.h / 2 : wall.w / 2;
+            
+            const closestX = Math.max(wall.x - halfW, Math.min(this.player.x, wall.x + halfW));
+            const closestY = Math.max(wall.y - halfH, Math.min(this.player.y, wall.y + halfH));
+            
+            const dx = this.player.x - closestX;
+            const dy = this.player.y - closestY;
+            const distSq = dx * dx + dy * dy;
+            
+            if (distSq < this.player.radius * this.player.radius) {
+                const dist = Math.sqrt(distSq);
+                if (dist > 0) {
+                    const overlap = this.player.radius - dist;
+                    this.player.x += (dx / dist) * overlap;
+                    this.player.y += (dy / dist) * overlap;
+                } else {
+                    const penX = halfW - Math.abs(this.player.x - wall.x);
+                    const penY = halfH - Math.abs(this.player.y - wall.y);
+                    if (penX < penY) {
+                        const sign = this.player.x > wall.x ? 1 : -1;
+                        this.player.x += sign * (penX + this.player.radius);
+                    } else {
+                        const sign = this.player.y > wall.y ? 1 : -1;
+                        this.player.y += sign * (penY + this.player.radius);
+                    }
+                }
+            }
+        });
+
+        // Xử lý dịch chuyển qua Portal cho Người chơi
+        this.portalGates.forEach(portal => {
+            if (portal.cooldown === 0) {
+                const dist = Vector.dist(this.player.x, this.player.y, portal.x, portal.y);
+                if (dist < this.player.radius + portal.radius) {
+                    portal.teleport(this.player, this);
+                }
             }
         });
 
@@ -1484,6 +1597,50 @@ class Game {
                     enemy.y += Math.sin(angle) * overlap;
                 }
             });
+
+            // Kẻ địch va chạm Tường Công Nghệ (Wall AABB vs Circle)
+            this.walls.forEach(wall => {
+                const halfW = (wall.angle === 0) ? wall.w / 2 : wall.h / 2;
+                const halfH = (wall.angle === 0) ? wall.h / 2 : wall.w / 2;
+                
+                const closestX = Math.max(wall.x - halfW, Math.min(ex, wall.x + halfW));
+                const closestY = Math.max(wall.y - halfH, Math.min(ey, wall.y + halfH));
+                
+                const dx = ex - closestX;
+                const dy = ey - closestY;
+                const distSq = dx * dx + dy * dy;
+                
+                if (distSq < er * er) {
+                    const dist = Math.sqrt(distSq);
+                    if (dist > 0) {
+                        const overlap = er - dist;
+                        enemy.x += (dx / dist) * overlap;
+                        enemy.y += (dy / dist) * overlap;
+                    } else {
+                        const penX = halfW - Math.abs(ex - wall.x);
+                        const penY = halfH - Math.abs(ey - wall.y);
+                        if (penX < penY) {
+                            const sign = ex > wall.x ? 1 : -1;
+                            enemy.x += sign * (penX + er);
+                        } else {
+                            const sign = ey > wall.y ? 1 : -1;
+                            enemy.y += sign * (penY + er);
+                        }
+                    }
+                }
+            });
+
+            // Kẻ địch dịch chuyển qua Portal (loại trừ Mine và Portal đệ để tránh lỗi)
+            if (enemy.type !== 'mine' && enemy.type !== 'portal') {
+                this.portalGates.forEach(portal => {
+                    if (portal.cooldown === 0) {
+                        const dist = Vector.dist(ex, ey, portal.x, portal.y);
+                        if (dist < er + portal.radius) {
+                            portal.teleport(enemy, this);
+                        }
+                    }
+                });
+            }
         });
 
         const now = performance.now();
@@ -1889,6 +2046,37 @@ class Game {
                             
                             this.bullets.push(splitBullet);
                         });
+                    }
+                    break;
+                }
+            }
+            if (bulletCollided) continue;
+
+            // Kiểm tra va chạm với Tường Công Nghệ (Walls)
+            for (let k = this.walls.length - 1; k >= 0; k--) {
+                const wall = this.walls[k];
+                const halfW = (wall.angle === 0) ? wall.w / 2 : wall.h / 2;
+                const halfH = (wall.angle === 0) ? wall.h / 2 : wall.w / 2;
+                
+                const closestX = Math.max(wall.x - halfW, Math.min(bx, wall.x + halfW));
+                const closestY = Math.max(wall.y - halfH, Math.min(by, wall.y + halfH));
+                
+                const dx = bx - closestX;
+                const dy = by - closestY;
+                const distSq = dx * dx + dy * dy;
+                
+                if (distSq < br * br) {
+                    bulletCollided = true;
+                    this.bullets.splice(i, 1);
+                    this.spawnBloodParticles(bx, by, wall.neonColor, 4);
+                    
+                    // Nổ ma pháp nếu là đạn Mage
+                    if (bullet.isOrb && bullet.isPlayerBullet) {
+                        if (bullet.isSingularity) {
+                            this.singularities.push(new GravitySingularity(bx, by, bullet.damage));
+                        } else {
+                            this.triggerMagicExplosion(bx, by, bullet.damage);
+                        }
                     }
                     break;
                 }
@@ -4266,6 +4454,20 @@ class Game {
         this.barrels.forEach(b => {
             if (this.isInView(b.x, b.y, b.radius)) {
                 b.draw(this.ctx, this.camera, this.mapTheme);
+            }
+        });
+
+        // Vẽ các bức tường công nghệ (Walls)
+        this.walls.forEach(wall => {
+            if (this.isInView(wall.x, wall.y, wall.radius)) {
+                wall.draw(this.ctx, this.camera, this.mapTheme);
+            }
+        });
+
+        // Vẽ các cổng dịch chuyển (Portal Gates)
+        this.portalGates.forEach(portal => {
+            if (this.isInView(portal.x, portal.y, portal.radius + 50)) {
+                portal.draw(this.ctx, this.camera);
             }
         });
 
