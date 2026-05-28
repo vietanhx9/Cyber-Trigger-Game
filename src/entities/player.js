@@ -444,7 +444,7 @@ export class Player {
             ctx.restore();
             
             // Sinh các hạt khói nhiệt màu cam/đỏ bay lên phía trên
-            if (Math.random() < 0.35 && window.gameEngine) {
+            if (Math.random() < 0.12 && window.gameEngine) {
                 const ox = this.x + (Math.random() - 0.5) * 20;
                 const oy = this.y + (Math.random() - 0.5) * 20;
                 const randColor = Math.random() < 0.65 ? '#ff5500' : '#ffaa00';

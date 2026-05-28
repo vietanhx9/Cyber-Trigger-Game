@@ -1661,6 +1661,11 @@ class Game {
             }
         }
 
+        // Giới hạn số lượng số trôi hiển thị (tối đa 40 để tránh lag do dựng font canvas)
+        if (this.floatingTexts.length > 40) {
+            this.floatingTexts.splice(0, this.floatingTexts.length - 40);
+        }
+
         // Cập nhật số trôi (Floating Texts)
         for (let i = this.floatingTexts.length - 1; i >= 0; i--) {
             this.floatingTexts[i].update();
@@ -3207,12 +3212,16 @@ class Game {
         // Tường lửa chống Overclock giảm 75% sát thương nhận vào của Boss
         if (enemy.type === 'boss' && enemy.firewallTimer > 0) {
             finalDamage *= 0.25;
-            if (Math.random() < 0.25) { // Tránh spam chữ quá dày đặc
+            
+            const now = Date.now();
+            if (!enemy.lastFirewallTextTime) enemy.lastFirewallTextTime = 0;
+            if (now - enemy.lastFirewallTextTime > 750) {
+                enemy.lastFirewallTextTime = now;
                 this.floatingTexts.push(new FloatingText(
-                    enemy.x + (Math.random() - 0.5) * 30, 
+                    enemy.x, 
                     enemy.y - enemy.radius - 25, 
-                    "🛡️ FIREWALL ACTIVE", 
-                    "#ff3131", 13
+                    "🛡️ FIREWALL ACTIVE (-75% DMG)", 
+                    "#ff3131", 14
                 ));
             }
         }
