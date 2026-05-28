@@ -189,8 +189,12 @@ export class Player {
         }
 
         // Cập nhật hồi chiêu kỹ năng
-        if (this.dashCooldown > 0) this.dashCooldown -= deltaTime;
-        if (this.shockwaveCooldown > 0) this.shockwaveCooldown -= deltaTime;
+        let cooldownRate = 1.0;
+        if (window.gameEngine && window.gameEngine.playerInMagicZone) {
+            cooldownRate = 1.35; // Giảm hồi chiêu nhanh hơn 35% trong Magic Zone
+        }
+        if (this.dashCooldown > 0) this.dashCooldown -= deltaTime * cooldownRate;
+        if (this.shockwaveCooldown > 0) this.shockwaveCooldown -= deltaTime * cooldownRate;
 
         // Cập nhật bộ đếm thời gian lướt
         if (this.isDashingTimer > 0) {
@@ -237,6 +241,19 @@ export class Player {
             currentSpeed *= 0.7;
         }
 
+        // Tương tác địa hình (Terrain Zones)
+        if (window.gameEngine) {
+            if (window.gameEngine.playerInBush) {
+                currentSpeed *= 0.75; // Giảm 25% tốc chạy trong bụi rậm
+            }
+            if (window.gameEngine.playerInDune) {
+                currentSpeed *= 0.65; // Giảm 35% tốc chạy trên đồi cát
+            }
+            if (window.gameEngine.playerInOasis) {
+                currentSpeed *= 1.15; // Tăng 15% tốc chạy trong ốc đảo
+            }
+        }
+
         // Di chuyển tự động khi đang lướt Shadow Dash (Sát thủ)
         if (this.shadowDashTimer > 0) {
             this.shadowDashTimer -= deltaTime;
@@ -274,13 +291,15 @@ export class Player {
             }
 
             const isZeroGravity = window.gameEngine && window.gameEngine.disasterActive && window.gameEngine.disasterType === 'zero_gravity';
-            if (isZeroGravity) {
-                // Acceleration: add to velocity
-                const acc = 0.15 * currentSpeed;
+            const isOnIce = window.gameEngine && window.gameEngine.playerOnIce;
+            if (isZeroGravity || isOnIce) {
+                // Trên băng có ma sát cực thấp, trượt nhiều hơn
+                const drag = isOnIce ? 0.985 : 0.96; 
+                const acc = (isOnIce ? 0.08 : 0.15) * currentSpeed;
                 this.vx += dx * acc;
                 this.vy += dy * acc;
                 
-                // Cap velocity to currentSpeed
+                // Giới hạn tốc độ phi thuyền
                 const speedSquared = this.vx * this.vx + this.vy * this.vy;
                 if (speedSquared > currentSpeed * currentSpeed) {
                     const speedVal = Math.sqrt(speedSquared);
@@ -288,9 +307,8 @@ export class Player {
                     this.vy = (this.vy / speedVal) * currentSpeed;
                 }
                 
-                // Apply drag: 4% friction
-                this.vx *= 0.96;
-                this.vy *= 0.96;
+                this.vx *= drag;
+                this.vy *= drag;
                 
                 this.x += this.vx;
                 this.y += this.vy;

@@ -172,6 +172,20 @@ export class Enemy {
             return;
         }
 
+        const isFrequencyGlitch = window.gameEngine && window.gameEngine.disasterActive && window.gameEngine.disasterType === 'frequency_glitch';
+        let currentSpeed = isFrequencyGlitch ? this.speed * 2.0 : this.speed;
+        if (window.gameEngine && window.gameEngine.player && window.gameEngine.player.upgrades.lagSwitch > 0) {
+            currentSpeed *= 0.65; // Giảm 35% tốc độ của quái vật do Lag Switch
+        }
+
+        // Tương tác địa hình
+        if (this.inBush) {
+            currentSpeed *= 0.75; // Giảm 25% tốc chạy trong bụi rậm
+        }
+        if (this.inDune) {
+            currentSpeed *= 0.65; // Giảm 35% tốc chạy trên đồi cát
+        }
+
         if (this.type === 'gold_bug') {
             // Gold Bug teleport liên tục mỗi 1.5 giây
             this.goldBugTeleportTimer = (this.goldBugTeleportTimer || 0) + deltaTime;
@@ -247,12 +261,6 @@ export class Enemy {
 
         this.angle = Vector.angle(this.x, this.y, target.x, target.y);
         const distToTarget = Vector.dist(this.x, this.y, target.x, target.y);
-
-        const isFrequencyGlitch = window.gameEngine && window.gameEngine.disasterActive && window.gameEngine.disasterType === 'frequency_glitch';
-        let currentSpeed = isFrequencyGlitch ? this.speed * 2.0 : this.speed;
-        if (window.gameEngine && window.gameEngine.player && window.gameEngine.player.upgrades.lagSwitch > 0) {
-            currentSpeed *= 0.65; // Giảm 35% tốc độ của quái vật do Lag Switch
-        }
 
         // Logic di chuyển cho từng loại quái vật
         if (this.type === 'shooter') {

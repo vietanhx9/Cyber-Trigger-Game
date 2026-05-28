@@ -7,7 +7,7 @@ import { Item } from './entities/item.js';
 import { Particle } from './effects/particle.js';
 import { FloatingText } from './effects/floatingText.js';
 import { Hazard } from './hazards/hazard.js';
-import { Pillar, Barrel, Wall, PortalGate } from './entities/obstacle.js';
+import { Pillar, Barrel, Wall, PortalGate, TerrainZone } from './entities/obstacle.js';
 import { BlastRing } from './effects/blastRing.js';
 import { LightningBolt } from './effects/lightningBolt.js';
 
@@ -110,6 +110,7 @@ class Game {
         this.barrels = [];
         this.walls = [];
         this.portalGates = [];
+        this.terrainZones = [];
         this.blastRings = [];
         this.homingMissiles = []; // Tên lửa tầm nhiệt đang bay
         this.swordSlashes = [];
@@ -667,6 +668,7 @@ class Game {
         this.barrels = [];
         this.walls = [];
         this.portalGates = [];
+        this.terrainZones = [];
         this.blastRings = [];
         this.homingMissiles = [];
         this.swordSlashes = [];
@@ -818,6 +820,198 @@ class Game {
 
         this.portalGates = [a1, a2, b1, b2];
         
+        // Sinh các Vùng Địa Hình Đặc Trưng (TerrainZones) phù hợp theo map theme
+        this.terrainZones = [];
+        if (this.mapTheme === 'jungle') {
+            // Jungle: 10 Bushes (Bụi rậm)
+            for (let i = 0; i < 10; i++) {
+                let tx, ty, tooClose, attempts = 0;
+                const r = 90 + Math.random() * 30; // bán kính 90-120px
+                do {
+                    attempts++;
+                    tx = Math.random() * (this.worldSize - 600) + 300;
+                    ty = Math.random() * (this.worldSize - 600) + 300;
+                    tooClose = false;
+                    // Tránh tâm bản đồ xuất phát
+                    if (Vector.dist(tx, ty, this.worldSize / 2, this.worldSize / 2) < 300) {
+                        tooClose = true;
+                    } else {
+                        // Tránh xa các cổng dịch chuyển
+                        this.portalGates.forEach(portal => {
+                            if (Vector.dist(tx, ty, portal.x, portal.y) < 300) tooClose = true;
+                        });
+                        if (!tooClose) {
+                            // Tránh đè lên các bụi rậm khác quá nhiều
+                            for (let zone of this.terrainZones) {
+                                if (Vector.dist(tx, ty, zone.x, zone.y) < 200) {
+                                    tooClose = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                } while (tooClose && attempts < 50);
+
+                if (!tooClose) {
+                    this.terrainZones.push(new TerrainZone(tx, ty, r, 'bush'));
+                }
+            }
+        } else if (this.mapTheme === 'desert') {
+            // Desert: 6 Dunes (Đồi cát) và 3 Oases (Ốc đảo trị thương)
+            for (let i = 0; i < 6; i++) {
+                let tx, ty, tooClose, attempts = 0;
+                const r = 110 + Math.random() * 40; // đồi cát lớn 110-150px
+                do {
+                    attempts++;
+                    tx = Math.random() * (this.worldSize - 600) + 300;
+                    ty = Math.random() * (this.worldSize - 600) + 300;
+                    tooClose = false;
+                    if (Vector.dist(tx, ty, this.worldSize / 2, this.worldSize / 2) < 300) {
+                        tooClose = true;
+                    } else {
+                        this.portalGates.forEach(portal => {
+                            if (Vector.dist(tx, ty, portal.x, portal.y) < 300) tooClose = true;
+                        });
+                        if (!tooClose) {
+                            for (let zone of this.terrainZones) {
+                                if (Vector.dist(tx, ty, zone.x, zone.y) < 250) {
+                                    tooClose = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                } while (tooClose && attempts < 50);
+
+                if (!tooClose) {
+                    this.terrainZones.push(new TerrainZone(tx, ty, r, 'dune'));
+                }
+            }
+
+            for (let i = 0; i < 3; i++) {
+                let tx, ty, tooClose, attempts = 0;
+                const r = 70 + Math.random() * 20; // ốc đảo 70-90px
+                do {
+                    attempts++;
+                    tx = Math.random() * (this.worldSize - 800) + 400;
+                    ty = Math.random() * (this.worldSize - 800) + 400;
+                    tooClose = false;
+                    if (Vector.dist(tx, ty, this.worldSize / 2, this.worldSize / 2) < 300) {
+                        tooClose = true;
+                    } else {
+                        this.portalGates.forEach(portal => {
+                            if (Vector.dist(tx, ty, portal.x, portal.y) < 400) tooClose = true;
+                        });
+                        if (!tooClose) {
+                            for (let zone of this.terrainZones) {
+                                if (Vector.dist(tx, ty, zone.x, zone.y) < 300) {
+                                    tooClose = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                } while (tooClose && attempts < 50);
+
+                if (!tooClose) {
+                    this.terrainZones.push(new TerrainZone(tx, ty, r, 'oasis'));
+                }
+            }
+        } else if (this.mapTheme === 'ice') {
+            // Ice: 8 Ice Patches (Băng trơn)
+            for (let i = 0; i < 8; i++) {
+                let tx, ty, tooClose, attempts = 0;
+                const r = 100 + Math.random() * 30; // tảng băng 100-130px
+                do {
+                    attempts++;
+                    tx = Math.random() * (this.worldSize - 600) + 300;
+                    ty = Math.random() * (this.worldSize - 600) + 300;
+                    tooClose = false;
+                    if (Vector.dist(tx, ty, this.worldSize / 2, this.worldSize / 2) < 300) {
+                        tooClose = true;
+                    } else {
+                        this.portalGates.forEach(portal => {
+                            if (Vector.dist(tx, ty, portal.x, portal.y) < 300) tooClose = true;
+                        });
+                        if (!tooClose) {
+                            for (let zone of this.terrainZones) {
+                                if (Vector.dist(tx, ty, zone.x, zone.y) < 220) {
+                                    tooClose = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                } while (tooClose && attempts < 50);
+
+                if (!tooClose) {
+                    this.terrainZones.push(new TerrainZone(tx, ty, r, 'ice_patch'));
+                }
+            }
+        } else if (this.mapTheme === 'highland') {
+            // Highland: 6 Magic Zones (Vòng ma pháp)
+            for (let i = 0; i < 6; i++) {
+                let tx, ty, tooClose, attempts = 0;
+                const r = 80 + Math.random() * 20; // 80-100px
+                do {
+                    attempts++;
+                    tx = Math.random() * (this.worldSize - 600) + 300;
+                    ty = Math.random() * (this.worldSize - 600) + 300;
+                    tooClose = false;
+                    if (Vector.dist(tx, ty, this.worldSize / 2, this.worldSize / 2) < 300) {
+                        tooClose = true;
+                    } else {
+                        this.portalGates.forEach(portal => {
+                            if (Vector.dist(tx, ty, portal.x, portal.y) < 300) tooClose = true;
+                        });
+                        if (!tooClose) {
+                            for (let zone of this.terrainZones) {
+                                if (Vector.dist(tx, ty, zone.x, zone.y) < 250) {
+                                    tooClose = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                } while (tooClose && attempts < 50);
+
+                if (!tooClose) {
+                    this.terrainZones.push(new TerrainZone(tx, ty, r, 'magic_zone'));
+                }
+            }
+        } else {
+            // Cyber (default): 8 Speed Pads (Mạch tăng tốc)
+            for (let i = 0; i < 8; i++) {
+                let tx, ty, tooClose, attempts = 0;
+                const r = 50 + Math.random() * 15; // 50-65px (size pad)
+                do {
+                    attempts++;
+                    tx = Math.random() * (this.worldSize - 600) + 300;
+                    ty = Math.random() * (this.worldSize - 600) + 300;
+                    tooClose = false;
+                    if (Vector.dist(tx, ty, this.worldSize / 2, this.worldSize / 2) < 300) {
+                        tooClose = true;
+                    } else {
+                        this.portalGates.forEach(portal => {
+                            if (Vector.dist(tx, ty, portal.x, portal.y) < 300) tooClose = true;
+                        });
+                        if (!tooClose) {
+                            for (let zone of this.terrainZones) {
+                                if (Vector.dist(tx, ty, zone.x, zone.y) < 200) {
+                                    tooClose = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                } while (tooClose && attempts < 50);
+
+                if (!tooClose) {
+                    this.terrainZones.push(new TerrainZone(tx, ty, r, 'speed_pad'));
+                }
+            }
+        }
+
         // Khởi tạo các hạt nền đặc trưng cho từng bản đồ (đom đóm, cát, tuyết rơi, cánh hoa ma thuật, bụi vũ trụ)
         this.stars = [];
         if (this.mapTheme === 'jungle') {
@@ -1451,6 +1645,95 @@ class Game {
             }
         }
 
+        // Cập nhật các Vùng Địa Hình (Terrain Zones) và áp dụng hiệu ứng cho người chơi & kẻ địch
+        this.playerOnIce = false;
+        this.playerInBush = false;
+        this.playerInDune = false;
+        this.playerInOasis = false;
+        this.playerInMagicZone = false;
+
+        this.enemies.forEach(enemy => {
+            enemy.inBush = false;
+            enemy.inDune = false;
+        });
+
+        if (this.terrainZones) {
+            this.terrainZones.forEach(zone => {
+                zone.update(deltaTime);
+
+                // Va chạm / đứng trong vùng địa hình của Người chơi
+                const distPlayer = Vector.dist(this.player.x, this.player.y, zone.x, zone.y);
+                if (distPlayer < zone.radius) {
+                    if (zone.type === 'bush') {
+                        this.playerInBush = true;
+                    } else if (zone.type === 'dune') {
+                        this.playerInDune = true;
+                    } else if (zone.type === 'oasis') {
+                        this.playerInOasis = true;
+                        
+                        // Hồi máu ốc đảo: +2 HP/sec -> scale theo deltaTime
+                        this.player.hp = Math.min(this.player.maxHp, this.player.hp + (2 * deltaTime / 1000));
+                        
+                        // Thêm hiệu ứng hạt bong bóng nước lấp lánh bay lên
+                        if (Math.random() < 0.15) {
+                            const p = new Particle(this.player.x + (Math.random() - 0.5) * 20, this.player.y + (Math.random() - 0.5) * 20, '#00ffff');
+                            p.vx = (Math.random() - 0.5) * 1;
+                            p.vy = -Math.random() * 1.5 - 0.5;
+                            p.life = 300 + Math.random() * 200;
+                            this.particles.push(p);
+                        }
+                    } else if (zone.type === 'ice_patch') {
+                        this.playerOnIce = true;
+                    } else if (zone.type === 'magic_zone') {
+                        this.playerInMagicZone = true;
+                        
+                        // Thêm hiệu ứng hạt ma thuật màu tím bay lên quanh player
+                        if (Math.random() < 0.2) {
+                            const p = new Particle(this.player.x + (Math.random() - 0.5) * 25, this.player.y + (Math.random() - 0.5) * 25, '#d946ef');
+                            p.vx = (Math.random() - 0.5) * 0.8;
+                            p.vy = -Math.random() * 1.2 - 0.4;
+                            p.life = 400 + Math.random() * 200;
+                            this.particles.push(p);
+                        }
+                    } else if (zone.type === 'speed_pad') {
+                        // Đẩy người chơi theo hướng mũi tên speed_pad
+                        const pushForce = 4.5; // Tốc độ đẩy
+                        this.player.x += Math.cos(zone.angle) * pushForce * (deltaTime / 16.67);
+                        this.player.y += Math.sin(zone.angle) * pushForce * (deltaTime / 16.67);
+                        
+                        // Sinh hạt phản lực màu vàng
+                        if (Math.random() < 0.3) {
+                            const px = this.player.x - Math.cos(zone.angle) * this.player.radius;
+                            const py = this.player.y - Math.sin(zone.angle) * this.player.radius;
+                            const p = new Particle(px, py, '#fffb00');
+                            p.vx = -Math.cos(zone.angle) * 2 + (Math.random() - 0.5) * 1;
+                            p.vy = -Math.sin(zone.angle) * 2 + (Math.random() - 0.5) * 1;
+                            p.life = 200 + Math.random() * 150;
+                            this.particles.push(p);
+                        }
+                    }
+                }
+
+                // Va chạm / đứng trong vùng địa hình của Kẻ địch (Enemies)
+                this.enemies.forEach(enemy => {
+                    if (enemy.hp <= 0) return;
+                    const distEnemy = Vector.dist(enemy.x, enemy.y, zone.x, zone.y);
+                    if (distEnemy < zone.radius + enemy.radius * 0.5) {
+                        if (zone.type === 'bush') {
+                            enemy.inBush = true;
+                        } else if (zone.type === 'dune') {
+                            enemy.inDune = true;
+                        } else if (zone.type === 'speed_pad') {
+                            // Đẩy quái vật theo hướng speed_pad
+                            const pushForce = 4.0;
+                            enemy.x += Math.cos(zone.angle) * pushForce * (deltaTime / 16.67);
+                            enemy.y += Math.sin(zone.angle) * pushForce * (deltaTime / 16.67);
+                        }
+                    }
+                });
+            });
+        }
+
         // Cập nhật người chơi
         this.player.update(this.keys, this.mouse, this.canvas.width, this.canvas.height, this.camera, deltaTime);
 
@@ -1653,6 +1936,9 @@ class Game {
         }
         if (this.player.hyperDriveActive) {
             modifiedFireRate /= 2.0; // Bắn nhanh gấp đôi khi Hyper-Drive
+        }
+        if (this.playerInMagicZone) {
+            modifiedFireRate /= 1.3; // Bắn nhanh hơn 30% khi đứng trong Vòng ma pháp
         }
 
         // 1. Tự động cận chiến quét kiếm khi quái tới gần cho Sát thủ (Assassin)
@@ -4362,6 +4648,15 @@ class Game {
             this.ctx.stroke();
         }
 
+        // Vẽ các Vùng Địa Hình Đặc Trưng (Terrain Zones)
+        if (this.terrainZones) {
+            this.terrainZones.forEach(zone => {
+                if (this.isInView(zone.x, zone.y, zone.radius + 50)) {
+                    zone.draw(this.ctx, this.camera);
+                }
+            });
+        }
+
         // Vẽ các mối nguy hiểm địa hình (Hazards) dưới đất
         if (this.hazards) {
             this.hazards.forEach(h => {
@@ -4631,7 +4926,12 @@ class Game {
         // 6. Vẽ quái vật (Enemies)
         this.enemies.forEach(enemy => {
             if (this.isInView(enemy.x, enemy.y, enemy.radius)) {
+                this.ctx.save();
+                if (enemy.inBush) {
+                    this.ctx.globalAlpha = 0.45;
+                }
                 enemy.draw(this.ctx, this.camera);
+                this.ctx.restore();
             }
         });
 
@@ -4645,7 +4945,11 @@ class Game {
         this.ctx.globalAlpha = 1.0; // Restore alpha cho các layer sau
         this.ctx.restore();
 
-        // 8. Vẽ người chơi (Player)
+        // 8. Vẽ người chơi (Player) & Các Vũ khí phụ
+        this.ctx.save();
+        if (this.playerInBush) {
+            this.ctx.globalAlpha = 0.45;
+        }
         this.player.draw(this.ctx, this.camera);
 
         // 8.5. Vẽ Vũ khí phụ xoay quanh người chơi & Laser Drone
@@ -4809,6 +5113,7 @@ this.ctx.beginPath();
                 this.ctx.restore();
             }
         }
+        this.ctx.restore();
 
         // Vẽ tia Hack của Hacking Drone nếu có hoạt động
         if (this.activeHackBeam) {
