@@ -639,12 +639,16 @@ export class Boss extends Enemy {
         this.bossState = 'WALK';
         this.stateTimer = 0;
         
+        // Trạng thái chống Overclock (Firewall)
+        this.detectedOverclock = false;
+        this.firewallTimer = 0;
+        
         switch (this.bossType) {
             case 'yellow_intruder':
                 this.name = 'CYBER INTRUDER';
                 this.radius = 65;
                 this.speed = 1.0;
-                this.maxHp = 1000;
+                this.maxHp = 1200;
                 this.damage = 30;
                 this.color = '#fffb00'; // Neon Yellow-Orange
                 this.chargeAngle = 0;
@@ -654,7 +658,7 @@ export class Boss extends Enemy {
                 this.name = 'NEON VORTEX';
                 this.radius = 60;
                 this.speed = 0.8;
-                this.maxHp = 1200;
+                this.maxHp = 1500;
                 this.damage = 25;
                 this.color = '#b026ff'; // Neon Purple
                 this.shieldAngle = 0;
@@ -664,7 +668,7 @@ export class Boss extends Enemy {
                 this.name = 'SYNAPSE REAPER';
                 this.radius = 55;
                 this.speed = 2.2;
-                this.maxHp = 900;
+                this.maxHp = 1100;
                 this.damage = 35;
                 this.color = '#ff007f'; // Neon Pink
                 break;
@@ -672,7 +676,7 @@ export class Boss extends Enemy {
                 this.name = 'ARCH OVERSEER';
                 this.radius = 75;
                 this.speed = 0.6;
-                this.maxHp = 1600;
+                this.maxHp = 1900;
                 this.damage = 40;
                 this.color = '#00f0ff'; // Neon Cyan
                 this.laserAngle = 0;
@@ -682,7 +686,7 @@ export class Boss extends Enemy {
                 this.name = 'GRID INFECTION';
                 this.radius = 60;
                 this.speed = 1.2;
-                this.maxHp = 1000;
+                this.maxHp = 1300;
                 this.damage = 28;
                 this.color = '#ff9f00'; // Neon Orange
                 this.hasSplit = false;
@@ -691,7 +695,8 @@ export class Boss extends Enemy {
         }
         
         this.maxHp = Math.floor(this.maxHp * statMultiplier);
-        this.damage = Math.floor(this.damage * statMultiplier);
+        // Sát thương tăng tiến vừa phải bằng 50% cường độ của HP để tránh shock dame
+        this.damage = Math.floor(this.damage * (1.0 + (statMultiplier - 1.0) * 0.5));
         
         this.hp = this.maxHp;
         this.xpValue = 60;
@@ -707,7 +712,51 @@ export class Boss extends Enemy {
             activeDelta *= 1.5; // Tăng 50% tốc độ thực hiện hành động/bắn đạn
         }
         
-        // Tăng tốc độ di chuyển tạm thời của Boss trong Frequency Glitch và trạng thái Rage
+        // Xử lý Giao thức Tường lửa & Phản công khi người chơi bật Overclock
+        if (player.overclockActive) {
+            if (!this.detectedOverclock) {
+                this.detectedOverclock = true;
+                this.firewallTimer = 3500; // 3.5 giây tường lửa hoạt động
+                
+                if (gameEngineRef) {
+                    // Đẩy lùi người chơi ra xa nhẹ để giữ khoảng cách an toàn
+                    const angleToPlayer = Vector.angle(this.x, this.y, player.x, player.y);
+                    player.x += Math.cos(angleToPlayer) * 110;
+                    player.y += Math.sin(angleToPlayer) * 110;
+                    
+                    // Thổi bay toàn bộ đạn của người chơi ở gần Boss
+                    if (gameEngineRef.bullets) {
+                        gameEngineRef.bullets = gameEngineRef.bullets.filter(bullet => {
+                            if (bullet.isPlayerBullet) {
+                                const dist = Vector.dist(this.x, this.y, bullet.x, bullet.y);
+                                return dist > this.radius + 150;
+                            }
+                            return true;
+                        });
+                    }
+                    
+                    // Hiện thông báo tường lửa
+                    gameEngineRef.floatingTexts.push(new FloatingText(
+                        this.x, this.y - this.radius - 20, 
+                        "⚠️ ANTI-HACK FIREWALL ENGAGED ⚠️", 
+                        "#ff3131", 20, true
+                    ));
+                    
+                    // Rung màn hình khi kích hoạt tường lửa
+                    gameEngineRef.triggerScreenShake(8, 200);
+                    // Bắn loạt đạn tỏa tròn phản công ngay lập tức
+                    this.fireBulletCircle(gameBullets);
+                }
+            }
+        } else {
+            this.detectedOverclock = false;
+        }
+
+        if (this.firewallTimer > 0) {
+            this.firewallTimer -= deltaTime;
+        }
+        
+        // Tăng tốc độ di chuyển tạm thời của Boss trong Frequency Glitch, trạng thái Rage và khi bị người chơi Overclock
         const originalSpeed = this.speed;
         const originalChargeSpeed = this.chargeSpeed;
         if (isFrequencyGlitch) {
@@ -718,12 +767,16 @@ export class Boss extends Enemy {
             this.speed *= 1.3;
             if (this.chargeSpeed) this.chargeSpeed *= 1.3;
         }
+        if (player.overclockActive) {
+            this.speed *= 1.5; // Điên cuồng di chuyển áp sát khi người chơi ép xung
+            if (this.chargeSpeed) this.chargeSpeed *= 1.5;
+        }
 
-        // Giảm lực đẩy lùi (Boss bị đẩy lùi rất ít)
+        // Kháng đẩy lùi cực mạnh cho Boss (hệ số giữ lại quán tính knockback nhỏ hơn nhiều)
         this.x += this.knockbackX;
         this.y += this.knockbackY;
-        this.knockbackX *= 0.6;
-        this.knockbackY *= 0.6;
+        this.knockbackX *= 0.25;
+        this.knockbackY *= 0.25;
 
         this.angle = Vector.angle(this.x, this.y, player.x, player.y);
         this.bossTimer += activeDelta;
@@ -1554,6 +1607,46 @@ export class Boss extends Enemy {
             ctx.lineTo(Math.cos(this.laserAngle) * 800, Math.sin(this.laserAngle) * 800);
             ctx.moveTo(0, 0);
             ctx.lineTo(Math.cos(this.laserAngle + Math.PI) * 800, Math.sin(this.laserAngle + Math.PI) * 800);
+            ctx.stroke();
+            
+            ctx.restore();
+        }
+        
+        // Vẽ Khiên Tường lửa bảo vệ màu đỏ chớp nháy xung quanh Boss
+        if (this.firewallTimer > 0) {
+            ctx.save();
+            ctx.translate(screenX, screenY);
+            
+            // Lắc nhẹ vòng bảo vệ để tạo cảm giác lực điện từ
+            const shieldOffset = Math.sin(Date.now() * 0.04) * 2;
+            
+            // 1. Quầng sáng khiên (Outer Glow)
+            ctx.globalAlpha = 0.2 + Math.sin(Date.now() * 0.02) * 0.1;
+            ctx.strokeStyle = '#ff3131';
+            ctx.lineWidth = 12;
+            ctx.beginPath();
+            ctx.arc(0, 0, this.radius * 1.45 + shieldOffset, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // 2. Viền khiên chính dạng lưới
+            ctx.globalAlpha = 0.85;
+            ctx.strokeStyle = '#ff9f00';
+            ctx.lineWidth = 2.5;
+            ctx.beginPath();
+            ctx.arc(0, 0, this.radius * 1.45 + shieldOffset, 0, Math.PI * 2);
+            ctx.stroke();
+            
+            // Vẽ các tia sét nhỏ bên trong vòng khiên
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 1.5;
+            ctx.rotate(Date.now() * 0.004);
+            ctx.beginPath();
+            for (let i = 0; i < 6; i++) {
+                ctx.rotate(Math.PI / 3);
+                ctx.moveTo(this.radius * 1.25, -5);
+                ctx.lineTo(this.radius * 1.45, 0);
+                ctx.lineTo(this.radius * 1.25, 5);
+            }
             ctx.stroke();
             
             ctx.restore();

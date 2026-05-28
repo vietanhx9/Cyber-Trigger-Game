@@ -1,5 +1,7 @@
 import { Vector } from '../utils/vector.js';
 import { sounds } from '../audio/soundManager.js';
+import { Particle } from '../effects/particle.js';
+import { FloatingText } from '../effects/floatingText.js';
 
 export class Player {
     constructor(x, y, role = 'fighter') {
@@ -141,6 +143,7 @@ export class Player {
         this.overclockEnergy = 0; // 0 to 100
         this.overclockActive = false;
         this.overclockTimer = 0; // ms
+        this.overheatTimer = 0; // ms (Thời gian quá nhiệt sau khi overclock)
     }
 
     update(keys, mouse, canvasWidth, canvasHeight, camera, deltaTime) {
@@ -157,7 +160,23 @@ export class Player {
                 this.overclockActive = false;
                 this.overclockTimer = 0;
                 this.overclockEnergy = 0;
+                this.overheatTimer = 3000; // 3 giây quá nhiệt phạt hạ nhiệt
+                
+                if (window.gameEngine) {
+                    window.gameEngine.floatingTexts.push(new FloatingText(
+                        this.x, this.y - this.radius - 20, 
+                        "SYSTEM OVERHEAT: COOLING DOWN... ⚠️", 
+                        "#ff5500", 18, true
+                    ));
+                    sounds.playHit(); // Còi cảnh báo quá nhiệt
+                }
             }
+        }
+
+        // Cập nhật bộ đếm thời gian quá nhiệt
+        if (this.overheatTimer > 0) {
+            this.overheatTimer -= deltaTime;
+            if (this.overheatTimer < 0) this.overheatTimer = 0;
         }
 
         // Cập nhật thời gian Hyper-Drive
@@ -205,6 +224,9 @@ export class Player {
             } else {
                 currentSpeed *= 1.25; // Các class khác tăng tốc 25%
             }
+        }
+        if (this.overheatTimer > 0) {
+            currentSpeed *= 0.7; // Giảm 30% tốc chạy khi phi thuyền bị quá nhiệt
         }
         if (window.gameEngine && window.gameEngine.disasterActive && window.gameEngine.disasterType === 'matrix_protocol') {
             currentSpeed *= 1.3; // Tăng 30% tốc độ di chuyển trong Matrix Protocol
@@ -408,6 +430,30 @@ export class Player {
             ctx.arc(0, 0, this.radius * 1.5, 0, Math.PI * 2);
             ctx.stroke();
             ctx.restore();
+        }
+
+        // Hiệu ứng Quá Nhiệt (Overheat) phát sáng cam/đỏ và xì khói
+        if (this.overheatTimer > 0) {
+            ctx.save();
+            ctx.globalAlpha = 0.25 + Math.sin(Date.now() * 0.035) * 0.15;
+            ctx.strokeStyle = '#ff5500';
+            ctx.lineWidth = 8;
+            ctx.beginPath();
+            ctx.arc(0, 0, this.radius * 1.35, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.restore();
+            
+            // Sinh các hạt khói nhiệt màu cam/đỏ bay lên phía trên
+            if (Math.random() < 0.35 && window.gameEngine) {
+                const ox = this.x + (Math.random() - 0.5) * 20;
+                const oy = this.y + (Math.random() - 0.5) * 20;
+                const randColor = Math.random() < 0.65 ? '#ff5500' : '#ffaa00';
+                const p = new Particle(ox, oy, randColor);
+                p.vx = (Math.random() - 0.5) * 1.5;
+                p.vy = -Math.random() * 2 - 0.5; // bay vút lên
+                p.life = 400 + Math.random() * 300;
+                window.gameEngine.particles.push(p);
+            }
         }
 
         // Hiệu ứng Hyper-Drive phát sáng hồng tím cực mạnh bao quanh

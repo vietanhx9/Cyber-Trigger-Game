@@ -1209,14 +1209,13 @@ class Game {
                 
                 const angle = Math.random() * Math.PI * 2;
                 let bossCount = 1;
-                let multiplier = 1.0;
+                // Máu Boss tỷ lệ động theo Level người chơi
+                let multiplier = 1.0 + (this.player.level - 1) * 0.25;
                 
                 if (this.player.level >= 8) {
                     bossCount = 2;
-                    multiplier = this.player.level > 11 ? 1.5 : 1.4;
                 } else if (this.player.level > 5) {
                     bossCount = 1;
-                    multiplier = 1.2;
                 }
                 
                 if (bossCount === 2) {
@@ -3198,6 +3197,24 @@ class Game {
 
         if (this.weatherActive && this.weatherType === 'solar_flare') {
             finalDamage *= 2;
+        }
+
+        // Giảm 40% sát thương của người chơi khi phi thuyền đang bị quá nhiệt (System Overheat)
+        if (this.player.overheatTimer > 0) {
+            finalDamage *= 0.6;
+        }
+
+        // Tường lửa chống Overclock giảm 75% sát thương nhận vào của Boss
+        if (enemy.type === 'boss' && enemy.firewallTimer > 0) {
+            finalDamage *= 0.25;
+            if (Math.random() < 0.25) { // Tránh spam chữ quá dày đặc
+                this.floatingTexts.push(new FloatingText(
+                    enemy.x + (Math.random() - 0.5) * 30, 
+                    enemy.y - enemy.radius - 25, 
+                    "🛡️ FIREWALL ACTIVE", 
+                    "#ff3131", 13
+                ));
+            }
         }
 
         // Áp dụng Độc Tố Dữ Liệu (Synergy Digital Venom)
