@@ -1529,7 +1529,8 @@ class Game {
                     
                     const angle = this.player.angle;
                     const maxLen = 700;
-                    const laserDamage = Math.max(1, Math.floor(this.player.damage * 0.35 * (1 + this.player.upgrades.damage * 0.25)));
+                    // Tăng mạnh hệ số sát thương từ 0.35 lên 2.2 để xứng tầm chiêu cuối Mega Beam
+                    const laserDamage = Math.max(2, Math.floor(this.player.damage * 2.2 * (1 + this.player.upgrades.damage * 0.25)));
                     
                     // Line-circle intersection with enemies
                     this.enemies.forEach((enemy, idx) => {
@@ -1543,7 +1544,8 @@ class Game {
                             
                             if (proj > 0 && proj < maxLen) {
                                 const perpDist = Math.abs(-ex * sinA + ey * cosA);
-                                const allowedDist = enemy.radius + 15;
+                                // Tăng bán kính va chạm lên +35px để quét trúng quái dễ dàng hơn
+                                const allowedDist = enemy.radius + 35;
                                 if (perpDist < allowedDist) {
                                     const vx = cosA * 2;
                                     const vy = sinA * 2;
@@ -1566,7 +1568,7 @@ class Game {
                         
                         if (proj > 0 && proj < maxLen) {
                             const perpDist = Math.abs(-ex * Math.sin(angle) + ey * Math.cos(angle));
-                            const allowedDist = b.radius + 15;
+                            const allowedDist = b.radius + 35;
                             if (perpDist < allowedDist) {
                                 this.triggerBarrelExplosion(b.x, b.y, 'ranger_overload');
                                 this.barrels.splice(j, 1);
@@ -4362,26 +4364,26 @@ class Game {
             
             this.ctx.save();
             
-            // Outer thick cyan glowing beam
-            this.ctx.strokeStyle = 'rgba(0, 240, 255, 0.4)';
-            this.ctx.lineWidth = 26;
+            // Outer thick cyan glowing beam (tăng kích thước từ 26 lên 45 để thể hiện Mega Beam)
+            this.ctx.strokeStyle = 'rgba(0, 240, 255, 0.35)';
+            this.ctx.lineWidth = 45;
             this.ctx.lineCap = 'round';
             this.ctx.beginPath();
             this.ctx.moveTo(startX, startY);
             this.ctx.lineTo(endX, endY);
             this.ctx.stroke();
             
-            // Middle cyan beam
+            // Middle cyan beam (tăng kích thước từ 12 lên 20)
             this.ctx.strokeStyle = '#00f0ff';
-            this.ctx.lineWidth = 12;
+            this.ctx.lineWidth = 20;
             this.ctx.beginPath();
             this.ctx.moveTo(startX, startY);
             this.ctx.lineTo(endX, endY);
             this.ctx.stroke();
             
-            // Inner white core
+            // Inner white core (tăng kích thước từ 4 lên 6)
             this.ctx.strokeStyle = '#ffffff';
-            this.ctx.lineWidth = 4;
+            this.ctx.lineWidth = 6;
             this.ctx.beginPath();
             this.ctx.moveTo(startX, startY);
             this.ctx.lineTo(endX, endY);
