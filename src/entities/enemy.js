@@ -639,9 +639,10 @@ export class Boss extends Enemy {
         this.bossState = 'WALK';
         this.stateTimer = 0;
         
-        // Trạng thái chống Overclock (Firewall)
+        // Trạng thái chống Overclock (Firewall) - Tự động kích hoạt khi vừa xuất hiện
         this.detectedOverclock = false;
-        this.firewallTimer = 0;
+        this.firewallTimer = 3500;
+        this.spawnShieldAlerted = false;
         
         switch (this.bossType) {
             case 'yellow_intruder':
@@ -704,6 +705,18 @@ export class Boss extends Enemy {
     }
 
     update(player, gameBullets, deltaTime, gameEngineRef) {
+        // Cảnh báo khiên bảo vệ vừa xuất hiện
+        if (!this.spawnShieldAlerted) {
+            this.spawnShieldAlerted = true;
+            if (gameEngineRef) {
+                gameEngineRef.floatingTexts.push(new FloatingText(
+                    this.x, this.y - this.radius - 20, 
+                    "⚠️ BOSS SHIELD ACTIVE (-75% DMG) ⚠️", 
+                    "#ff3131", 20, true
+                ));
+            }
+        }
+
         const isFrequencyGlitch = gameEngineRef && gameEngineRef.disasterActive && gameEngineRef.disasterType === 'frequency_glitch';
         const isRaged = (this.hp / this.maxHp < 0.40);
         
