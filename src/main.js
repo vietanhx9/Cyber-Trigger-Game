@@ -4904,8 +4904,8 @@ this.ctx.beginPath();
             {
                 id: 'overheated',
                 name: 'ÉP XUNG QUÁ NHIỆT',
-                desc: 'Tăng điên cuồng <span class="buff-text">+80% Tốc độ bắn</span>, nhưng <span class="debuff-text">tự mất 1 HP mỗi 2 giây</span>.',
-                stat: '+80% Fire Rate / -1 HP mỗi 2.0s',
+                desc: 'Tăng cực hạn <span class="buff-text">+35% Tốc độ bắn</span>, nhưng <span class="debuff-text">tự mất 1 HP mỗi 2 giây</span>.',
+                stat: '+35% Fire Rate / -1 HP mỗi 2.0s',
                 cost: 12,
                 icon: '🔥'
             },
@@ -4935,7 +4935,18 @@ this.ctx.beginPath();
             }
         ];
         
-        const pool = [...allHackedPool].sort(() => 0.5 - Math.random()).slice(0, 3);
+        // Lọc bỏ những nâng cấp đã đạt giới hạn tối đa để tránh quá bá đạo (OP)
+        const filteredHackedPool = allHackedPool.filter(upgrade => {
+            const currentCount = this.player.upgrades[upgrade.id] || 0;
+            if (upgrade.id === 'glassCore') return currentCount < 1; // Chỉ mua tối đa 1 lần
+            if (upgrade.id === 'overheated') return currentCount < 2; // Chỉ mua tối đa 2 lần
+            if (upgrade.id === 'lagSwitch') return currentCount < 2; // Chỉ mua tối đa 2 lần
+            if (upgrade.id === 'limitBreak') return currentCount < 3; // Chỉ mua tối đa 3 lần
+            if (upgrade.id === 'nanoDrain') return currentCount < 3; // Chỉ mua tối đa 3 lần
+            return true;
+        });
+
+        const pool = [...filteredHackedPool].sort(() => 0.5 - Math.random()).slice(0, 3);
         const choicesGrid = document.getElementById('hacked-shop-choices');
         if (choicesGrid) {
             choicesGrid.innerHTML = '';
@@ -4977,12 +4988,17 @@ this.ctx.beginPath();
         
         if (id === 'glassCore') {
             this.player.upgrades.glassCore = (this.player.upgrades.glassCore || 0) + 1;
-            this.player.damage *= 2.5;
+            // Chỉ nhân damage 1 lần duy nhất khi nâng cấp lõi này
+            if (this.player.upgrades.glassCore === 1) {
+                this.player.damage *= 2.5;
+            }
             this.player.maxHp = 40;
             this.player.hp = Math.min(this.player.hp, 40);
         } else if (id === 'overheated') {
             this.player.upgrades.overheated = (this.player.upgrades.overheated || 0) + 1;
-            this.player.fireRate *= 0.55;
+            this.player.fireRate *= 0.74; // tương đương +35% Tốc độ bắn (1/1.35 ≈ 0.74)
+            // Giới hạn cứng tốc độ bắn cơ bản tối thiểu là 100ms để tránh phá vỡ cơ chế game
+            this.player.fireRate = Math.max(100, this.player.fireRate);
         } else if (id === 'lagSwitch') {
             this.player.upgrades.lagSwitch = (this.player.upgrades.lagSwitch || 0) + 1;
             this.player.dashCooldownMax *= 1.5;
